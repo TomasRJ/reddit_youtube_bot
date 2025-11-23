@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 axum = { version = "0.8.7", features = ["macros"] }
 chrono = { version = "0.4.42", features = ["serde"] }
+clap = { version = "4.5.53", features = ["derive"] }
 quick-xml = { version = "0.38.4", features = ["serialize"] }
 serde = { version = "1.0.228", features = ["derive"] }
 thiserror = "2.0.17"
