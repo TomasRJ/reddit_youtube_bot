@@ -8,7 +8,9 @@ use utoipa_rapidoc::RapiDoc;
 #[derive(OpenApi)]
 #[openapi(
     paths(),
-    components(schemas()),
+    components(schemas(
+        google::VerificationMode        
+    )),
     servers((url = "", description = "Reddit YouTube bot")),
 )]
 pub struct ApiDoc;

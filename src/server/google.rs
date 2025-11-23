@@ -1,4 +1,4 @@
-use axum::{Json, http::HeaderMap};
+use axum::{Json, extract::Query, http::HeaderMap};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -7,7 +7,9 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 use crate::server::ApiError;
 
 pub fn router() -> OpenApiRouter {
-    OpenApiRouter::new().routes(routes!(new_video_published))
+    OpenApiRouter::new()
+    .routes(routes!(new_video_published))
+    .routes(routes!(subscription_callback))
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -53,6 +55,7 @@ impl From<quick_xml::DeError> for ApiError {
     }
 }
 
+/// New video published
 #[utoipa::path(
         post,
         path = "/",
@@ -71,4 +74,48 @@ async fn new_video_published(headers: HeaderMap, body: String) -> Result<Json<Fe
     println!("signature: {:?}", signature);
 
     Ok(Json(xml))
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub enum VerificationMode {
+    #[serde(rename = "subscribe")]
+    Subscribe,
+    #[serde(rename = "unsubscribe")]
+    Unsubscribe
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+struct Verification {
+    #[serde(rename = "hub.mode")]
+    pub mode: VerificationMode,
+    #[serde(rename = "hub.topic")]
+    pub topic: String,
+    #[serde(rename = "hub.challenge")]
+    pub challenge: String,
+    #[serde(rename = "hub.lease_seconds")]
+    pub lease_seconds: u64,
+}
+
+/// Hub verification request
+#[utoipa::path(
+        get,
+        path = "/",
+        description = "Google PubSubHubbub subscription verification",
+        params(
+            ("hub.mode" = VerificationMode, Query, description = "The literal string \"subscribe\" or \"unsubscribe\", which matches the original request to the hub from the subscriber.", example = "subscribe"),
+            ("hub.topic" = String, Query, description = "The topic URL given in the corresponding subscription request.", example = "https://www.youtube.com/xml/feeds/videos.xml?channel_id=UCBR8-60-B28hp2BmDPdntcQ"),
+            ("hub.challenge" = String, Query, description = "A hub-generated, random string that MUST be echoed by the subscriber to verify the subscription.", example = "14828210609622910347"),
+            ("hub.lease_seconds" = Option<u64>, Query, description = "The hub-determined number of seconds that the subscription will stay active before expiring, measured from the time the verification request was made from the hub to the subscriber. This parameter MAY be present for unsubscribe requests and MUST be ignored by subscribers during unsubscription.", example = 432000)
+        ),
+        responses(
+            (status = 200, description = "The challenge string.", body = String),
+            (status = 400, description = "Missing required query arguments."),            
+        ),        
+    )]
+#[axum::debug_handler]
+async fn subscription_callback(Query(verification): Query<Verification>) -> Result<String, ApiError> {
+    println!("New YouTube video verification request received: {:?}", &verification);
+    
+
+    Ok(verification.challenge)
 }
