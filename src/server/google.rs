@@ -1,15 +1,42 @@
-use axum::{Json, extract::Query, http::HeaderMap};
+use std::sync::Arc;
+
+use axum::{
+    Json,
+    extract::{Query, State},
+    http::HeaderMap,
+};
 use chrono::{DateTime, Utc};
+use hmac::{Hmac, Mac, digest::crypto_common};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-use crate::server::ApiError;
+use crate::{infrastructure::AppState, server::ApiError};
 
-pub fn router() -> OpenApiRouter {
+pub fn router() -> OpenApiRouter<Arc<AppState>> {
     OpenApiRouter::new()
-    .routes(routes!(new_video_published))
-    .routes(routes!(subscription_callback))
+        .routes(routes!(new_video_published))
+        .routes(routes!(subscription_callback))
+}
+
+impl From<quick_xml::DeError> for ApiError {
+    fn from(error: quick_xml::DeError) -> Self {
+        ApiError::BadRequest(format!("Invalid XML request: {:?}", error))
+    }
+}
+
+impl From<crypto_common::InvalidLength> for ApiError {
+    fn from(error: crypto_common::InvalidLength) -> Self {
+        ApiError::InternalError(format!("Error handling HMAC secret: {:?}", error))
+    }
+}
+impl From<axum::http::header::ToStrError> for ApiError {
+    fn from(error: axum::http::header::ToStrError) -> Self {
+        ApiError::InternalError(format!(
+            "The X-Hub-Signature header is not a valid string: {:?}",
+            error
+        ))
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -19,6 +46,53 @@ pub struct Feed {
     pub title: String,
     pub updated: DateTime<Utc>,
     pub entry: Entry,
+}
+
+type HmacSha1 = Hmac<sha1::Sha1>;
+
+impl Feed {
+    fn validate(hmac_secret: &String, headers: HeaderMap, body: String) -> Result<Feed, ApiError> {
+        match headers.get("X-Hub-Signature") {
+            Some(signature) => {
+                let signature = if let Some(("sha1", hash)) = signature.to_str()?.split_once('=') {
+                    hash
+                } else {
+                    return Err(ApiError::BadRequest(format!(
+                        "Invalid X-Hub-Signature header format: {:?}, expected sha1=signature",
+                        signature
+                    )));
+                };
+
+                if signature.len() != 40 {
+                    return Err(ApiError::BadRequest(format!(
+                        "Invalid SHA1 signature: {}, length in bytes: {}",
+                        signature,
+                        signature.len()
+                    )));
+                }
+
+                let mut hasher = HmacSha1::new_from_slice(hmac_secret.as_bytes())?;
+                hasher.update(body.as_bytes());
+                let hash = hasher.finalize();
+
+                let hash_string = format!("{:x}", hash.into_bytes()); // format the bytes to a lowercase hex string
+
+                if signature.ne(&hash_string) {
+                    return Err(ApiError::BadRequest(format!(
+                        "The signature in the header: {} does not match the calculated signature: {}",
+                        signature, hash_string
+                    )));
+                }
+
+                let feed: Feed = quick_xml::de::from_str(&body)?;
+
+                Ok(feed)
+            }
+            None => Err(ApiError::BadRequest(
+                "The new video request has no X-Hub-Signature header.".into(),
+            )),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -49,31 +123,28 @@ pub struct Author {
     pub uri: String,
 }
 
-impl From<quick_xml::DeError> for ApiError {
-    fn from(error: quick_xml::DeError) -> Self {
-        ApiError::BadRequest(format!("Invalid XML request: {:?}", error))
-    }
-}
-
 /// New video published
 #[utoipa::path(
         post,
         path = "/",
         request_body(content = Feed, description = "Google PubSubHubbub XML request", content_type = "application/atom+xml"),
+        params(
+            ("X-Hub-Signature" = String, Header, description = "Google PubSubHubbub HMAC signature for the request body in the form of \"sha1=signature\" where signature is a 40-byte, hexadecimal representation of a SHA1 signature. Source https://pubsubhubbub.github.io/PubSubHubbub/pubsubhubbub-core-0.4.html#rfc.section.8", example = "sha1=e7667dbb6b9dc356ac8dd767560926d5403be497")
+        ),
         responses(
             (status = 200, body = Feed),
             (status = 400, description = "Bad request, possible malformed XML or X-Hub-Signature header is missing."),            
-        ),        
+        ),
     )]
 #[axum::debug_handler]
-async fn new_video_published(headers: HeaderMap, body: String) -> Result<Json<Feed>, ApiError> {
-    println!("New YouTube video published");
-    let xml: Feed = quick_xml::de::from_str(&body)?;
+async fn new_video_published(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    body: String,
+) -> Result<Json<Feed>, ApiError> {
+    let feed = Feed::validate(&state.hmac_secret, headers, body)?;
 
-    let signature = headers.get("X-Hub-Signature");
-    println!("signature: {:?}", signature);
-
-    Ok(Json(xml))
+    Ok(Json(feed))
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -81,7 +152,7 @@ pub enum VerificationMode {
     #[serde(rename = "subscribe")]
     Subscribe,
     #[serde(rename = "unsubscribe")]
-    Unsubscribe
+    Unsubscribe,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -110,12 +181,16 @@ struct Verification {
         responses(
             (status = 200, description = "The challenge string.", body = String),
             (status = 400, description = "Missing required query arguments."),            
-        ),        
+        ),
     )]
 #[axum::debug_handler]
-async fn subscription_callback(Query(verification): Query<Verification>) -> Result<String, ApiError> {
-    println!("New YouTube video verification request received: {:?}", &verification);
-    
+async fn subscription_callback(
+    Query(verification): Query<Verification>,
+) -> Result<String, ApiError> {
+    println!(
+        "New YouTube video verification request received: {:?}",
+        &verification
+    );
 
     Ok(verification.challenge)
 }

@@ -1,25 +1,32 @@
-use crate::server::google;
 use axum::response::IntoResponse;
 use thiserror::Error;
+
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_rapidoc::RapiDoc;
+
+use crate::{
+    infrastructure::{AppState, Settings},
+    server::google,
+};
 
 #[derive(OpenApi)]
 #[openapi(
     paths(),
     components(schemas(
-        google::VerificationMode        
+        google::VerificationMode
     )),
     servers((url = "", description = "Reddit YouTube bot")),
 )]
 pub struct ApiDoc;
 
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
-pub async fn serve(port: u16) -> Result<(), ApiError> {
-    println!("Starting serving API");
+pub async fn serve(port: u16, app_settings: Settings) -> Result<(), ApiError> {
+    let state = AppState::new(app_settings).await;
+
     let (router, _api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
-        .nest("/google", google::router())
+        .nest("/subscribe", google::router())
+        .with_state(state)
         .split_for_parts();
 
     let router =

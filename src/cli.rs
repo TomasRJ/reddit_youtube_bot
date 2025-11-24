@@ -1,7 +1,10 @@
 use clap::{Parser, Subcommand, command};
 use thiserror::Error;
 
-use crate::server::{ApiError, serve};
+use crate::{
+    infrastructure::{Settings, SettingsError},
+    server::{ApiError, serve},
+};
 
 #[derive(Debug, Parser)]
 #[command(name = env!("CARGO_PKG_NAME"))]
@@ -24,16 +27,20 @@ impl Cli {
         Cli::parse()
     }
 
-    pub async fn handle(self) -> Result<(), CommandError> {
+    pub async fn handle(self, app_settings: Settings) -> Result<(), CommandError> {
         match self.command {
             Commands::Start { port } => {
                 if !(1024..=65535).contains(&port) {
                     return Err(CommandError::InvalidPort(port));
                 }
-                serve(port).await?;
+                serve(port, app_settings).await?;
             }
         }
         Ok(())
+    }
+
+    pub fn load_settings(&self) -> Result<Settings, CommandError> {
+        Ok(Settings::new()?)
     }
 }
 
@@ -43,4 +50,6 @@ pub enum CommandError {
     InvalidPort(u16),
     #[error("API error: {0}")]
     ApiError(#[from] ApiError),
+    #[error("Settings error: {0}")]
+    SettingsError(#[from] SettingsError),
 }
