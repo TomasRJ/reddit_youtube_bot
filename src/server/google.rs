@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
-    Json,
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::HeaderMap,
 };
 use chrono::{DateTime, Utc};
@@ -11,7 +10,10 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-use crate::{infrastructure::AppState, server::ApiError};
+use crate::{
+    infrastructure::AppState,
+    server::{ApiError, repository::get_subscription_for_user},
+};
 
 pub fn router() -> OpenApiRouter<Arc<AppState>> {
     OpenApiRouter::new()
@@ -30,6 +32,7 @@ impl From<crypto_common::InvalidLength> for ApiError {
         ApiError::InternalError(format!("Error handling HMAC secret: {:?}", error))
     }
 }
+
 impl From<axum::http::header::ToStrError> for ApiError {
     fn from(error: axum::http::header::ToStrError) -> Self {
         ApiError::InternalError(format!(
@@ -78,10 +81,10 @@ impl Feed {
                 let hash_string = format!("{:x}", hash.into_bytes()); // format the bytes to a lowercase hex string
 
                 if signature.ne(&hash_string) {
-                    return Err(ApiError::BadRequest(format!(
-                        "The signature in the header: {} does not match the calculated signature: {}",
-                        signature, hash_string
-                    )));
+                    return Err(ApiError::BadRequest(
+                        "The signature in the header does not match the calculated signature"
+                            .to_string(),
+                    ));
                 }
 
                 let feed: Feed = quick_xml::de::from_str(&body)?;
@@ -89,7 +92,7 @@ impl Feed {
                 Ok(feed)
             }
             None => Err(ApiError::BadRequest(
-                "The new video request has no X-Hub-Signature header.".into(),
+                "The new video request has no X-Hub-Signature header.".to_string(),
             )),
         }
     }
@@ -126,25 +129,34 @@ pub struct Author {
 /// New video published
 #[utoipa::path(
         post,
-        path = "/",
+        path = "/subscription/{user_id}/{channel_id}",
         request_body(content = Feed, description = "Google PubSubHubbub XML request", content_type = "application/atom+xml"),
         params(
-            ("X-Hub-Signature" = String, Header, description = "Google PubSubHubbub HMAC signature for the request body in the form of \"sha1=signature\" where signature is a 40-byte, hexadecimal representation of a SHA1 signature. Source https://pubsubhubbub.github.io/PubSubHubbub/pubsubhubbub-core-0.4.html#rfc.section.8", example = "sha1=e7667dbb6b9dc356ac8dd767560926d5403be497")
+            ("X-Hub-Signature" = String, Header, description = "Google PubSubHubbub HMAC signature for the request body in the form of \"sha1=signature\" where signature is a 40-byte, hexadecimal representation of a SHA1 signature. Source https://pubsubhubbub.github.io/PubSubHubbub/pubsubhubbub-core-0.4.html#rfc.section.8", example = "sha1=e7667dbb6b9dc356ac8dd767560926d5403be497"),
+            ("user_id" = i64, Path, description = "User id", example = "1"),
+            ("channel_id" = String, Path, description = "YouTube channel id", example = "UCBR8-60-B28hp2BmDPdntcQ")
         ),
         responses(
             (status = 200, body = Feed),
-            (status = 400, description = "Bad request, possible malformed XML or X-Hub-Signature header is missing."),            
+            (status = 400, description = "Bad request, possible malformed XML or X-Hub-Signature header."),            
         ),
     )]
 #[axum::debug_handler]
 async fn new_video_published(
     State(state): State<Arc<AppState>>,
+    Path((user_id, channel_id)): Path<(i64, String)>,
     headers: HeaderMap,
     body: String,
-) -> Result<Json<Feed>, ApiError> {
-    let feed = Feed::validate(&state.hmac_secret, headers, body)?;
+) -> Result<(), ApiError> {
+    let subscription = get_subscription_for_user(&state.db_pool, &user_id, &channel_id).await?;
+    let feed = Feed::validate(&subscription.hmac_secret, headers, body)?;
 
-    Ok(Json(feed))
+    // Shorts are only posted when the user has explicitly set post_shorts to true.
+    if feed.entry.link.href.contains("shorts") && !subscription.post_shorts {
+        return Ok(());
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, Deserialize, ToSchema)]

@@ -25,7 +25,7 @@ pub async fn serve(port: u16, app_settings: Settings) -> Result<(), ApiError> {
     let state = AppState::new(app_settings).await;
 
     let (router, _api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
-        .nest("/subscribe", google::router())
+        .nest("/google", google::router())
         .with_state(state)
         .split_for_parts();
 
