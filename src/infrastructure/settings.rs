@@ -5,7 +5,7 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Settings {
-    pub hmac_secret: String,
+    pub database_url: String,
 }
 
 impl Settings {
@@ -13,7 +13,7 @@ impl Settings {
         dotenvy::dotenv()?;
 
         Ok(Self {
-            hmac_secret: env::var("HMAC_SECRET")?,
+            database_url: env::var("DATABASE_URL")?,
         })
     }
 }

@@ -1,0 +1,72 @@
+CREATE TABLE users (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL
+);
+
+CREATE INDEX user_id_index ON users (id);
+
+CREATE INDEX username_index ON users (username);
+
+CREATE TABLE sessions (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX session_id_index ON sessions (id);
+
+CREATE INDEX session_user_id_index ON sessions (user_id);
+
+CREATE TABLE subscriptions (
+    channel_id TEXT NOT NULL PRIMARY KEY,
+    hmac_secret TEXT NOT NULL,
+    expires INTEGER NOT NULL,
+    reddit_account_id INTEGER NOT NULL,
+    post_shorts INTEGER NOT NULL
+);
+
+CREATE INDEX subscription_index ON subscriptions (channel_id);
+
+CREATE TABLE user_subscriptions (
+    user_id INTEGER NOT NULL,
+    channel_id TEXT NOT NULL,
+    PRIMARY KEY (user_id, channel_id),
+    FOREIGN KEY (channel_id) REFERENCES subscriptions(channel_id) ON DELETE CASCADE
+);
+
+CREATE TABLE reddit_accounts (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    user_agent TEXT NOT NULL,
+    client_id TEXT NOT NULL,
+    user_secret TEXT NOT NULL,
+    oauth_token TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+
+CREATE INDEX reddit_accounts_index ON reddit_accounts (id);
+
+CREATE TABLE subscription_reddit_accounts (
+    channel_id TEXT NOT NULL,
+    reddit_account_id INTEGER NOT NULL,
+    PRIMARY KEY (channel_id, reddit_account_id),
+    FOREIGN KEY (reddit_account_id) REFERENCES reddit_accounts(id) ON DELETE CASCADE
+);
+
+CREATE TABLE subreddits (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    title_prefix TEXT,
+    title_suffix TEXT,
+    flair_id TEXT
+);
+
+CREATE INDEX subreddits_index ON subreddits (id);
+
+CREATE TABLE reddit_account_subreddits (
+    reddit_account_id INTEGER NOT NULL,
+    subreddit_id INTEGER NOT NULL,
+    PRIMARY KEY (reddit_account_id, subreddit_id),
+    FOREIGN KEY (subreddit_id) REFERENCES subreddits(id) ON DELETE CASCADE
+);
