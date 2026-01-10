@@ -20,10 +20,10 @@ CREATE INDEX session_id_index ON sessions (id);
 CREATE INDEX session_user_id_index ON sessions (user_id);
 
 CREATE TABLE subscriptions (
-    channel_id TEXT NOT NULL PRIMARY KEY,
+    id TEXT NOT NULL PRIMARY KEY,
+    channel_id TEXT NOT NULL,
     hmac_secret TEXT NOT NULL,
     expires INTEGER NOT NULL,
-    reddit_account_id INTEGER NOT NULL,
     post_shorts INTEGER NOT NULL
 );
 
@@ -31,9 +31,9 @@ CREATE INDEX subscription_index ON subscriptions (channel_id);
 
 CREATE TABLE user_subscriptions (
     user_id INTEGER NOT NULL,
-    channel_id TEXT NOT NULL,
-    PRIMARY KEY (user_id, channel_id),
-    FOREIGN KEY (channel_id) REFERENCES subscriptions(channel_id) ON DELETE CASCADE
+    subscription_id TEXT NOT NULL,
+    PRIMARY KEY (user_id, subscription_id),
+    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
 );
 
 CREATE TABLE reddit_accounts (
@@ -48,9 +48,9 @@ CREATE TABLE reddit_accounts (
 CREATE INDEX reddit_accounts_index ON reddit_accounts (id);
 
 CREATE TABLE subscription_reddit_accounts (
-    channel_id TEXT NOT NULL,
+    subscription_id TEXT NOT NULL,
     reddit_account_id INTEGER NOT NULL,
-    PRIMARY KEY (channel_id, reddit_account_id),
+    PRIMARY KEY (subscription_id, reddit_account_id),
     FOREIGN KEY (reddit_account_id) REFERENCES reddit_accounts(id) ON DELETE CASCADE
 );
 
