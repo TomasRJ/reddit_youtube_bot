@@ -8,38 +8,34 @@ impl From<sqlx::Error> for ApiError {
     }
 }
 
+#[allow(dead_code)]
 pub struct Subscription {
+    pub id: String,
     pub channel_id: String,
     pub hmac_secret: String,
     pub expires: i64,
-    pub reddit_account_id: i64,
     pub post_shorts: bool,
 }
 
-pub async fn get_subscription_for_user(
+pub async fn get_subscription_details(
     pool: &Pool<Sqlite>,
-    user_id: &i64,
-    channel_id: &String,
+    subscription_id: &String,
 ) -> Result<Subscription, ApiError> {
     let subscription = query_as!(
         Subscription,
         r#"
         SELECT
+            s.id,
             s.channel_id,
             s.hmac_secret,
             s.expires,
-            s.reddit_account_id,
             s.post_shorts as "post_shorts: bool"
         FROM
-            user_subscriptions us
-        INNER JOIN subscriptions s ON
-            us.channel_id = s.channel_id
+            subscriptions s
         WHERE
-            us.user_id = ?
-            AND s.channel_id = ?;
+            s.id = ?;
         "#,
-        user_id,
-        channel_id
+        subscription_id
     )
     .fetch_optional(&*pool)
     .await?;
@@ -48,7 +44,7 @@ pub async fn get_subscription_for_user(
         Some(sub) => Ok(sub),
         None => Err(ApiError::NotFound(format!(
             "No subscription found for channel id: {}",
-            channel_id
+            subscription_id
         ))),
     }
 }

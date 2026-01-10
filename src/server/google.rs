@@ -12,7 +12,7 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::{
     infrastructure::AppState,
-    server::{ApiError, repository::get_subscription_for_user},
+    server::{ApiError, repository::get_subscription_details},
 };
 
 pub fn router() -> OpenApiRouter<Arc<AppState>> {
@@ -129,26 +129,26 @@ pub struct Author {
 /// New video published
 #[utoipa::path(
         post,
-        path = "/subscription/{user_id}/{channel_id}",
+        path = "/subscription/{id}",
         request_body(content = Feed, description = "Google PubSubHubbub XML request", content_type = "application/atom+xml"),
         params(
-            ("X-Hub-Signature" = String, Header, description = "Google PubSubHubbub HMAC signature for the request body in the form of \"sha1=signature\" where signature is a 40-byte, hexadecimal representation of a SHA1 signature. Source https://pubsubhubbub.github.io/PubSubHubbub/pubsubhubbub-core-0.4.html#rfc.section.8", example = "sha1=e7667dbb6b9dc356ac8dd767560926d5403be497"),
-            ("user_id" = i64, Path, description = "User id", example = "1"),
-            ("channel_id" = String, Path, description = "YouTube channel id", example = "UCBR8-60-B28hp2BmDPdntcQ")
+            ("X-Hub-Signature" = String, Header, description = "Google PubSubHubbub HMAC signature for the request body in the form of \"sha1=signature\" where the signature is a 40-byte, hexadecimal representation of a SHA1 signature. Source https://pubsubhubbub.github.io/PubSubHubbub/pubsubhubbub-core-0.4.html#rfc.section.8", example = "sha1=e7667dbb6b9dc356ac8dd767560926d5403be497"),
+            ("id" = String, Path, description = "Subscription id", example = "019ba504-70f5-7f35-9c2c-2f02b992af7e")
         ),
         responses(
-            (status = 200, body = Feed),
+            (status = 200, description = "Successful request."),
             (status = 400, description = "Bad request, possible malformed XML or X-Hub-Signature header."),            
+            (status = 404, description = "Subscription doesn't exists."),
         ),
     )]
 #[axum::debug_handler]
 async fn new_video_published(
     State(state): State<Arc<AppState>>,
-    Path((user_id, channel_id)): Path<(i64, String)>,
+    Path(subscription_id): Path<String>,
     headers: HeaderMap,
     body: String,
 ) -> Result<(), ApiError> {
-    let subscription = get_subscription_for_user(&state.db_pool, &user_id, &channel_id).await?;
+    let subscription = get_subscription_details(&state.db_pool, &subscription_id).await?;
     let feed = Feed::validate(&subscription.hmac_secret, headers, body)?;
 
     // Shorts are only posted when the user has explicitly set post_shorts to true.
