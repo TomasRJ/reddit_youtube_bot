@@ -70,3 +70,14 @@ CREATE TABLE reddit_account_subreddits (
     PRIMARY KEY (reddit_account_id, subreddit_id),
     FOREIGN KEY (subreddit_id) REFERENCES subreddits(id) ON DELETE CASCADE
 );
+
+CREATE TABLE submissions (
+    id TEXT NOT NULL PRIMARY KEY,
+    video_id TEXT NOT NULL,
+    subreddit_id INTEGER NOT NULL,
+    reddit_account_id INTEGER NOT NULL,
+    subscription_id TEXT NOT NULL,
+    FOREIGN KEY (subreddit_id) REFERENCES subreddits(id) ON DELETE CASCADE,
+    FOREIGN KEY (reddit_account_id) REFERENCES reddit_accounts(id) ON DELETE CASCADE,
+    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
+)
