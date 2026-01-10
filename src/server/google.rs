@@ -137,7 +137,7 @@ pub struct Author {
         ),
         responses(
             (status = 200, description = "Successful request."),
-            (status = 400, description = "Bad request, possible malformed XML or X-Hub-Signature header."),            
+            (status = 400, description = "Bad request, possible malformed XML or X-Hub-Signature header."),
             (status = 404, description = "Subscription doesn't exists."),
         ),
     )]
@@ -176,7 +176,7 @@ struct Verification {
     #[serde(rename = "hub.challenge")]
     pub challenge: String,
     #[serde(rename = "hub.lease_seconds")]
-    pub lease_seconds: u64,
+    pub lease_seconds: Option<u64>,
 }
 
 /// Hub verification request
