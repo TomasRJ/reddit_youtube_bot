@@ -1,0 +1,33 @@
+### New video published
+@baseUrl = http://localhost:3000
+@hmac_secret = secret
+@subscriptionId = 019ba504-70f5-7f35-9c2c-2f02b992af7e
+
+// Pre-request script to generate a X-Hub-Signature header for any request body
+{{
+  const crypto = require('crypto');
+  const body = request.body;
+  const hmac = crypto.createHmac('sha1', hmac_secret)
+                     .update(body)
+                     .digest('hex');
+  exports.dynamicSignature = `sha1=${hmac}`;
+}}
+
+POST {{baseUrl}}/google/subscription/{{subscriptionId}}
+X-Hub-Signature: {{dynamicSignature}}
+Content-Type: application/atom+xml
+
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom"><link rel="hub" href="https://pubsubhubbub.appspot.com"/><link rel="self" href="https://www.youtube.com/xml/feeds/videos.xml?channel_id=UCRb4V8WHojbGqEvzL_9g03Q"/><title>YouTube video feed</title><updated>2025-03-24T17:00:02.916571846+00:00</updated><entry>
+  <id>yt:video:0qAMnxGlx_8</id>
+  <yt:videoId>0qAMnxGlx_8</yt:videoId>
+  <yt:channelId>UCRb4V8WHojbGqEvzL_9g03Q</yt:channelId>
+  <title>How we deal with failure</title>
+  <link rel="alternate" href="https://www.youtube.com/watch?v=0qAMnxGlx_8"/>
+  <author>
+   <name>astrogoblin</name>
+   <uri>https://www.youtube.com/channel/UCRb4V8WHojbGqEvzL_9g03Q</uri>
+  </author>
+  <published>2025-03-24T17:00:01+00:00</published>
+  <updated>2025-03-24T17:00:02.916571846+00:00</updated>
+ </entry></feed>
