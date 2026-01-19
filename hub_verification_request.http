@@ -1,0 +1,20 @@
+### Hub verification request
+# Google PubSubHubbub subscription verification
+
+@baseUrl = http://localhost:3000
+@hubTopic = https://www.youtube.com/xml/feeds/videos.xml?channel_id=UCBR8-60-B28hp2BmDPdntcQ
+@challengeStr = 14828210609622910347
+
+GET {{baseUrl}}/google
+    ?hub.mode=subscribe
+    &hub.topic={{hubTopic}}
+    &hub.challenge={{challengeStr}}
+    &hub.lease_seconds=432000
+
+// Post request script to verify the hub.challenge str is the response body
+{{  
+  const assert = require('assert');
+  test("the hub.challenge str is the response body.", () => {
+    assert.equal(response.body, challengeStr);
+  });
+}}
