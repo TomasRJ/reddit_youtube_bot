@@ -80,4 +80,9 @@ CREATE TABLE submissions (
     FOREIGN KEY (subreddit_id) REFERENCES subreddits(id) ON DELETE CASCADE,
     FOREIGN KEY (reddit_account_id) REFERENCES reddit_accounts(id) ON DELETE CASCADE,
     FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
-)
+);
+
+CREATE TABLE forms (
+    id TEXT NOT NULL PRIMARY KEY,
+    form_data TEXT NOT NULL 
+);

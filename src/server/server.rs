@@ -7,7 +7,7 @@ use utoipa_rapidoc::RapiDoc;
 
 use crate::{
     infrastructure::{AppState, Settings},
-    server::{frontend, google},
+    server::{forms, frontend, google},
 };
 
 #[derive(OpenApi)]
@@ -27,6 +27,7 @@ pub async fn serve(port: u16, app_settings: Settings) -> Result<(), ApiError> {
     let (router, _api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .merge(frontend::router())
         .nest("/google", google::router())
+        .nest("/forms", forms::router())
         .with_state(state)
         .split_for_parts();
 

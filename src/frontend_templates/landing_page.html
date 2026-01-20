@@ -5,4 +5,28 @@
     <article>
         <p>This bot will automatically post a Reddit post when a new video is uploaded to a YouTube channel.</p>
     </article>
+    <article>
+        <div class="mt-5 mx-0 p-4 col-lg-6 col-md-8 container-sm border border-black rounded">
+            <h4>Authorize to post on Reddit</h4>
+            <form method="post" action="forms/reddit">
+                <label for="client_id" class="form-label">Reddit Client ID</label>
+                <input type="text" id="authorize_client_id" name="client_id" class="form-control" required>
+                <label for="client_id" class="form-label">Reddit Secret</label>
+                <input type="text" id="authorize_secret" name="secret" class="form-control" required>
+                <label for="redirect_url" class="form-label">Reddit Redirect URL</label>
+                <input type="text" id="authorize_redirect_url" name="redirect_url" class="form-control" required>
+                <label for="duration" class="form-label">Duration of the authorization</label>
+                <select id="authorize_duration" class="form-select" name="duration" required>
+                    <option selected value="permanent">permanent</option>
+                    <option value="temporary">temporary</option>
+                </select>
+                <label for="scope" class="form-label">Scope (only valid values are: identity, edit, flair, history,
+                    modconfig, modflair, modlog, modposts, modwiki, mysubreddits, privatemessages, read, report, save,
+                    submit, subscribe, vote, wikiedit, wikiread)</label>
+                <input type="text" id="authorize_scope" name="scopes" class="form-control"
+                    value="identity,submit,modposts">
+                <button type="submit" id="authorize_submit" class="btn btn-primary mt-3">Open Link</button>
+            </form>
+        </div>
+    </article>
 </section>
