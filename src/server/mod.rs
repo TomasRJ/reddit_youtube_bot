@@ -1,3 +1,4 @@
+mod frontend;
 mod google;
 mod repository;
 mod server;

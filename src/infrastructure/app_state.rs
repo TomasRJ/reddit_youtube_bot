@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use handlebars::Handlebars;
 use sqlx::SqlitePool;
 
 use crate::infrastructure::{connect::get_pool, settings::Settings};
@@ -7,6 +8,7 @@ use crate::infrastructure::{connect::get_pool, settings::Settings};
 #[derive(Clone)]
 pub struct AppState {
     pub db_pool: SqlitePool,
+    pub hb: Handlebars<'static>,
 }
 
 impl AppState {
@@ -15,6 +17,10 @@ impl AppState {
             .await
             .expect("Error connecting to local SQLite DB.");
 
-        Arc::new(Self { db_pool })
+        let mut hb = Handlebars::new();
+        hb.register_template_file("whole_document", "src/frontend_templates/base_layout.html")
+            .expect("Error parsing base_layout template");
+
+        Arc::new(Self { db_pool, hb })
     }
 }
