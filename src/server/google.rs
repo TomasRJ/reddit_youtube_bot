@@ -201,10 +201,7 @@ struct Verification {
 async fn subscription_callback(
     Query(verification): Query<Verification>,
 ) -> Result<String, ApiError> {
-    println!(
-        "New YouTube video verification request received: {:?}",
-        &verification
-    );
+    println!("New YouTube video verification request received.");
 
     Ok(verification.challenge)
 }
