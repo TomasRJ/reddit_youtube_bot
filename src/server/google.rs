@@ -140,6 +140,7 @@ pub struct Author {
             (status = 400, description = "Bad request, possible malformed XML or X-Hub-Signature header."),
             (status = 404, description = "Subscription doesn't exists."),
         ),
+        tag = "google"
     )]
 #[axum::debug_handler]
 async fn new_video_published(
@@ -194,6 +195,7 @@ struct Verification {
             (status = 200, description = "The challenge string.", body = String),
             (status = 400, description = "Missing required query arguments."),            
         ),
+        tag = "google"
     )]
 #[axum::debug_handler]
 async fn subscription_callback(
