@@ -1,6 +1,10 @@
-use sqlx::{Pool, Sqlite, query, query_as};
+use chrono::Utc;
+use sqlx::{Pool, Sqlite, query, query_as, query_scalar};
 
-use crate::server::ApiError;
+use crate::server::{
+    ApiError,
+    shared::{RedditAuthorizeForm, RedditOAuthToken},
+};
 
 impl From<sqlx::Error> for ApiError {
     fn from(error: sqlx::Error) -> Self {
@@ -69,6 +73,67 @@ pub async fn save_form_data(
         return Err(ApiError::InternalError(format!(
             "save_form_data rows_affected error: {:?}",
             save_form_data_result
+        )));
+    }
+
+    Ok(())
+}
+
+pub async fn fetch_form_data<T>(pool: &Pool<Sqlite>, key: &String) -> Result<T, ApiError>
+where
+    T: serde::de::DeserializeOwned, // This allows T to be any struct
+{
+    let form_data_json = query_scalar!(
+        r#"
+        SELECT
+            f.form_data
+        FROM
+            forms f
+        WHERE
+            f.id = ?;
+        "#,
+        key,
+    )
+    .fetch_optional(&*pool)
+    .await?;
+
+    match form_data_json {
+        Some(json_string) => Ok(serde_json::from_str::<T>(&json_string)?),
+        None => Err(ApiError::NotFound(format!(
+            "No form data found for the state str: {}",
+            key
+        ))),
+    }
+}
+
+pub async fn save_reddit_oauth_token(
+    pool: &Pool<Sqlite>,
+    username: &String,
+    oauth_token: &RedditOAuthToken,
+    reddit_auth_form_data: RedditAuthorizeForm,
+) -> Result<(), ApiError> {
+    let expires_at_timestamp = Utc::now().timestamp() + &oauth_token.expires_in;
+    let oauth_token_json_str = serde_json::to_string(&oauth_token)?;
+
+    let save_reddit_oauth_token_result = query!(
+        r#"
+        INSERT INTO reddit_accounts(username, user_agent, client_id, user_secret, oauth_token, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?);
+        "#,
+        username,
+        reddit_auth_form_data.user_agent,
+        reddit_auth_form_data.client_id,
+        reddit_auth_form_data.secret,
+        oauth_token_json_str,
+        expires_at_timestamp,
+    )
+    .execute(&*pool)
+    .await?;
+
+    if save_reddit_oauth_token_result.rows_affected() != 1 {
+        return Err(ApiError::InternalError(format!(
+            "save_form_data rows_affected error: {:?}",
+            save_reddit_oauth_token_result
         )));
     }
 

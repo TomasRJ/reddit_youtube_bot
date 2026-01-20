@@ -24,3 +24,13 @@ pub enum FormType {
     Reddit,
     Youtube,
 }
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct RedditOAuthToken {
+    pub access_token: String,
+    pub token_type: String,
+    pub expires_in: i64,
+    pub scope: String,
+    pub refresh_token: Option<String>,
+}

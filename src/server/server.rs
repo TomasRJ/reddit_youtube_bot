@@ -7,14 +7,15 @@ use utoipa_rapidoc::RapiDoc;
 
 use crate::{
     infrastructure::{AppState, Settings},
-    server::{forms, frontend, google},
+    server::{forms, frontend, google, reddit},
 };
 
 #[derive(OpenApi)]
 #[openapi(
     paths(),
     components(schemas(
-        google::VerificationMode
+        google::VerificationMode,
+        reddit::RedditCallbackErrors
     )),
     servers((url = "", description = "Reddit YouTube bot")),
 )]
@@ -28,6 +29,7 @@ pub async fn serve(port: u16, app_settings: Settings) -> Result<(), ApiError> {
         .merge(frontend::router())
         .nest("/google", google::router())
         .nest("/forms", forms::router())
+        .nest("/reddit", reddit::router())
         .with_state(state)
         .split_for_parts();
 

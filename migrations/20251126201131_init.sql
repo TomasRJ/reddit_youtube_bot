@@ -38,7 +38,7 @@ CREATE TABLE user_subscriptions (
 
 CREATE TABLE reddit_accounts (
     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    user_agent TEXT NOT NULL,
+    username TEXT NOT NULL,
     client_id TEXT NOT NULL,
     user_secret TEXT NOT NULL,
     oauth_token TEXT NOT NULL,
