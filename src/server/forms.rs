@@ -2,6 +2,8 @@ use std::{collections::HashSet, sync::Arc};
 
 use axum::{Form, extract::State, response::Redirect};
 
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 use uuid::Uuid;
 
@@ -10,7 +12,7 @@ use crate::{
     server::{
         ApiError,
         repository::save_form_data,
-        shared::{FormType, RedditAuthorizeForm},
+        shared::{FormType, RedditAuthorization, RedditAuthorizeDuration},
     },
 };
 
@@ -49,8 +51,17 @@ const REDDIT_SCOPES: [&'static str; 19] = [
     "wikiread",
 ];
 
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct RedditAuthorizeForm {
+    pub client_id: String,
+    pub secret: String,
+    pub redirect_url: String,
+    pub duration: RedditAuthorizeDuration,
+    pub scopes: String,
+}
+
 impl RedditAuthorizeForm {
-    fn validate(authorize_form_data: &Self) -> Result<Self, ApiError> {
+    fn validate(authorize_form_data: &Self) -> Result<RedditAuthorization, ApiError> {
         let scopes = authorize_form_data.scopes.trim().trim_matches(',').trim();
         let client_id = authorize_form_data.client_id.trim();
         let redirect_url = authorize_form_data.redirect_url.trim();
@@ -84,7 +95,7 @@ impl RedditAuthorizeForm {
             return Err(ApiError::BadRequest("'identity' scope needed".into()));
         }
 
-        Ok(Self {
+        Ok(RedditAuthorization {
             r#type: FormType::Reddit,
             client_id: client_id.to_string(),
             secret: secret.to_string(),
@@ -101,7 +112,7 @@ impl RedditAuthorizeForm {
         post,
         request_body(content = RedditAuthorizeForm, description = "Create the Reddit authorize URL from Reddit authorize form", content_type = "application/x-www-form-urlencoded"),
         path = "/reddit",
-        description = "Main landing page",
+        description = "Redirect to Reddit authorize URL via from input",
         responses(
             (status = 303, description = "Reddit authorize URL redirect."),
             (status = 400, description = "Invalid form data."),
@@ -112,12 +123,12 @@ impl RedditAuthorizeForm {
 #[axum::debug_handler]
 async fn reddit_authorize_submission(
     State(state): State<Arc<AppState>>,
-    Form(authorize): Form<RedditAuthorizeForm>,
+    Form(form_input): Form<RedditAuthorizeForm>,
 ) -> Result<Redirect, ApiError> {
-    let form_data = RedditAuthorizeForm::validate(&authorize)?;
+    let reddit_authorization = RedditAuthorizeForm::validate(&form_input)?;
 
     let uuid = Uuid::new_v4();
-    let authorize_submission_json_str = serde_json::to_string(&form_data)?;
+    let authorize_submission_json_str = serde_json::to_string(&reddit_authorization)?;
     save_form_data(
         &state.db_pool,
         &uuid.to_string(),
@@ -127,11 +138,11 @@ async fn reddit_authorize_submission(
 
     let authorize_url = format!(
         "https://www.reddit.com/api/v1/authorize?client_id={client_id}&response_type=code&state={state_string}&redirect_uri={redirect_url}&duration={duration}&scope={scope_string}",
-        client_id = form_data.client_id,
+        client_id = reddit_authorization.client_id,
         state_string = uuid,
-        redirect_url = form_data.redirect_url,
-        duration = form_data.duration,
-        scope_string = form_data.scopes
+        redirect_url = reddit_authorization.redirect_url,
+        duration = reddit_authorization.duration,
+        scope_string = reddit_authorization.scopes
     );
 
     Ok(Redirect::to(&authorize_url))

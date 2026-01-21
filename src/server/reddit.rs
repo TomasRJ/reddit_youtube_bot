@@ -12,7 +12,7 @@ use crate::{
     server::{
         ApiError,
         repository::{fetch_form_data, save_reddit_oauth_token},
-        shared::{RedditAuthorizeForm, RedditOAuthToken},
+        shared::{RedditAuthorization, RedditOAuthToken},
     },
 };
 
@@ -101,7 +101,7 @@ async fn reddit_callback(
 ) -> Result<(), ApiError> {
     let state_uuid = RedditCallback::validate(&callback.state, &callback.error)?;
 
-    let reddit_auth_form_data: RedditAuthorizeForm =
+    let reddit_auth_form_data: RedditAuthorization =
         fetch_form_data(&state.db_pool, &state_uuid.to_string()).await?;
 
     let client = reqwest::Client::new();

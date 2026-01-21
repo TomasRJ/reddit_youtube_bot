@@ -3,7 +3,7 @@ use sqlx::{Pool, Sqlite, query, query_as, query_scalar};
 
 use crate::server::{
     ApiError,
-    shared::{RedditAuthorizeForm, RedditOAuthToken},
+    shared::{RedditAuthorization, RedditOAuthToken},
 };
 
 impl From<sqlx::Error> for ApiError {
@@ -110,7 +110,7 @@ pub async fn save_reddit_oauth_token(
     pool: &Pool<Sqlite>,
     username: &String,
     oauth_token: &RedditOAuthToken,
-    reddit_auth_form_data: RedditAuthorizeForm,
+    reddit_auth_form_data: RedditAuthorization,
 ) -> Result<(), ApiError> {
     let expires_at_timestamp = Utc::now().timestamp() + &oauth_token.expires_in;
     let oauth_token_json_str = serde_json::to_string(&oauth_token)?;

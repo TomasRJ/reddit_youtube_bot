@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
+use serde_textual::DisplaySerde;
 use utoipa::ToSchema;
 
-#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
-pub struct RedditAuthorizeForm {
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct RedditAuthorization {
     pub r#type: FormType,
     pub client_id: String,
     pub secret: String,
@@ -12,14 +13,14 @@ pub struct RedditAuthorizeForm {
     pub scopes: String,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, serde_textual::DisplaySerde, Clone, Debug)]
+#[derive(Serialize, Deserialize, ToSchema, DisplaySerde, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum RedditAuthorizeDuration {
     Permanent,
     Temporary,
 }
 
-#[derive(Serialize, Deserialize, utoipa::ToSchema, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum FormType {
     Reddit,
     Youtube,
