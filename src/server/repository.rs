@@ -117,11 +117,10 @@ pub async fn save_reddit_oauth_token(
 
     let save_reddit_oauth_token_result = query!(
         r#"
-        INSERT INTO reddit_accounts(username, user_agent, client_id, user_secret, oauth_token, expires_at)
-        VALUES (?, ?, ?, ?, ?, ?);
+        INSERT INTO reddit_accounts(username, client_id, user_secret, oauth_token, expires_at)
+        VALUES (?, ?, ?, ?, ?);
         "#,
         username,
-        reddit_auth_form_data.user_agent,
         reddit_auth_form_data.client_id,
         reddit_auth_form_data.secret,
         oauth_token_json_str,
