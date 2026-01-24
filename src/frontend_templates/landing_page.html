@@ -1,12 +1,22 @@
 <header>
     <h2>YouTube upload Reddit post bot</h2>
 </header>
-<section>
-    <article>
+
+<script type="text/javascript">
+    document.addEventListener("DOMContentLoaded", () => {
+        const subscribe_callback_url = document.getElementById("subscribe_callback_url");
+        if (subscribe_callback_url) {
+            subscribe_callback_url.value = `${window.location.href}`;
+        }
+    });
+</script>
+
+<section class="d-flex flex-wrap">
+    <article class="w-100">
         <p>This bot will automatically post a Reddit post when a new video is uploaded to a YouTube channel.</p>
     </article>
-    <article>
-        <div class="mt-5 mx-0 p-4 col-lg-6 col-md-8 container-sm border border-black rounded">
+    <div class="d-flex justify-content-around">
+        <article class="mt-5 mx-0 p-4 col-lg-5 col-md-8 container-sm border border-black rounded">
             <h4>Authorize to post on Reddit</h4>
             <form method="post" action="forms/reddit">
                 <label for="authorize_client_id" class="form-label">Reddit Client ID</label>
@@ -28,6 +38,27 @@
                     value="identity,submit,modposts">
                 <button type="submit" id="authorize_submit" class="btn btn-primary mt-3">Open Link</button>
             </form>
-        </div>
-    </article>
+        </article>
+        <article class="mt-5 mx-0 p-4 col-lg-5 col-md-8 container-sm border border-black rounded">
+            <h4>Subscribe to a YouTube channel</h4>
+            <p><a href="https://www.streamweasels.com/%20tools/youtube-channel-id-and-%20user-id-convertor/">Link to
+                    website to get a YouTube channel id</a></p>
+            <form method="post" action="forms/subscribe">
+                <label for="subscribe_topic" class="form-label">Topic URL</label>
+                <input type="text" id="subscribe_topic" name="topic_url" class="form-control"
+                    value="https://www.youtube.com/xml/feeds/videos.xml?channel_id=" required>
+                <label for="subscripe_hmac" class="form-label">Subscription HMAC <a
+                        href="https://pubsubhubbub.github.io/PubSubHubbub/pubsubhubbub-core-0.4.html#authednotify">(info)</a></label>
+                <input type="text" id="subscripe_hmac" name="hmac_secret" class="form-control" required>
+                <label for="subscribe_post_shorts" class="form-label">Submit YouTube
+                    shorts?</label>
+                <select id="subscribe_post_shorts" class="form-select" name="post_shorts" required>
+                    <option selected value="false">No</option>
+                    <option value="true">Yes</option>
+                </select>
+                <input type="hidden" id="subscribe_callback_url" name="callback_url" class="form-control" required>
+                <button type="submit" id="authorize_submit" class="btn btn-primary mt-3">Subscribe</button>
+            </form>
+        </article>
+    </div>
 </section>
