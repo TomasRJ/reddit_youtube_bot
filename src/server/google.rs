@@ -12,13 +12,19 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::{
     infrastructure::AppState,
-    server::{ApiError, repository::get_subscription_details},
+    server::{
+        ApiError, SubCommand,
+        repository::{fetch_form_data, get_subscription_details, handle_youtube_subscription},
+        shared::{
+            Verification, VerificationMode, YouTubeSubscription, extract_channel_id_from_topic_url,
+        },
+    },
 };
 
 pub fn router() -> OpenApiRouter<Arc<AppState>> {
     OpenApiRouter::new()
         .routes(routes!(new_video_published))
-        .routes(routes!(subscription_callback))
+        .routes(routes!(subscription_verification))
 }
 
 impl From<quick_xml::DeError> for ApiError {
@@ -160,32 +166,13 @@ async fn new_video_published(
     Ok(())
 }
 
-#[derive(Debug, Deserialize, ToSchema)]
-pub enum VerificationMode {
-    #[serde(rename = "subscribe")]
-    Subscribe,
-    #[serde(rename = "unsubscribe")]
-    Unsubscribe,
-}
-
-#[derive(Debug, Deserialize, ToSchema)]
-struct Verification {
-    #[serde(rename = "hub.mode")]
-    pub mode: VerificationMode,
-    #[serde(rename = "hub.topic")]
-    pub topic: String,
-    #[serde(rename = "hub.challenge")]
-    pub challenge: String,
-    #[serde(rename = "hub.lease_seconds")]
-    pub lease_seconds: Option<u64>,
-}
-
 /// Hub verification request
 #[utoipa::path(
         get,
-        path = "/",
+        path = "/subscription/{id}",
         description = "Google PubSubHubbub subscription verification",
         params(
+            ("id" = String, Path, description = "Subscription id", example = "019ba504-70f5-7f35-9c2c-2f02b992af7e"),
             ("hub.mode" = VerificationMode, Query, description = "The literal string \"subscribe\" or \"unsubscribe\", which matches the original request to the hub from the subscriber.", example = "subscribe"),
             ("hub.topic" = String, Query, description = "The topic URL given in the corresponding subscription request.", example = "https://www.youtube.com/xml/feeds/videos.xml?channel_id=UCBR8-60-B28hp2BmDPdntcQ"),
             ("hub.challenge" = String, Query, description = "A hub-generated, random string that MUST be echoed by the subscriber to verify the subscription.", example = "14828210609622910347"),
@@ -198,10 +185,49 @@ struct Verification {
         tag = "google"
     )]
 #[axum::debug_handler]
-async fn subscription_callback(
+async fn subscription_verification(
+    State(state): State<Arc<AppState>>,
+    Path(subscription_id): Path<String>,
     Query(verification): Query<Verification>,
 ) -> Result<String, ApiError> {
-    println!("New YouTube video verification request received.");
+    let channel_id = extract_channel_id_from_topic_url(&verification.topic)?.to_string();
+
+    println!(
+        "Received Google PubSubHubbub subscription verification request for YouTube channel: https://www.youtube.com/channel/{}",
+        &channel_id
+    );
+
+    let expires_at = if let Some(wait_secs) = verification.lease_seconds {
+        let buffer = 3600; // 1 hour in seconds to resubscribe early
+
+        // schedule the resubscription
+        let _ = state
+            .scheduler_sender
+            .send(SubCommand::Schedule {
+                subscription_id: subscription_id.clone(),
+                wait_secs: (wait_secs - buffer).max(0),
+            })
+            .await;
+
+        Some(Utc::now().timestamp() + wait_secs)
+    } else {
+        None
+    };
+
+    let subscription_form: YouTubeSubscription =
+        fetch_form_data(&state.db_pool, &subscription_id).await?;
+
+    handle_youtube_subscription(
+        &state.db_pool,
+        &subscription_id,
+        &expires_at,
+        &channel_id,
+        &verification,
+        &subscription_form,
+    )
+    .await?;
+
+    println!("Google PubSubHubbub subscription verification request handled.");
 
     Ok(verification.challenge)
 }

@@ -3,7 +3,9 @@ use sqlx::{Pool, Sqlite, query, query_as, query_scalar};
 
 use crate::server::{
     ApiError,
-    shared::{RedditAuthorization, RedditOAuthToken},
+    shared::{
+        RedditAuthorization, RedditOAuthToken, Verification, VerificationMode, YouTubeSubscription,
+    },
 };
 
 impl From<sqlx::Error> for ApiError {
@@ -17,7 +19,7 @@ pub struct Subscription {
     pub id: String,
     pub channel_id: String,
     pub hmac_secret: String,
-    pub expires: i64,
+    pub expires: Option<i64>,
     pub post_shorts: bool,
 }
 
@@ -47,7 +49,7 @@ pub async fn get_subscription_details(
     match subscription {
         Some(sub) => Ok(sub),
         None => Err(ApiError::NotFound(format!(
-            "No subscription found for channel id: {}",
+            "No subscription found for subscription id: {}",
             subscription_id
         ))),
     }
@@ -137,4 +139,56 @@ pub async fn save_reddit_oauth_token(
     }
 
     Ok(())
+}
+
+pub async fn handle_youtube_subscription(
+    pool: &Pool<Sqlite>,
+    uuid_str: &String,
+    expires_at: &Option<i64>,
+    channel_id: &String,
+    verification: &Verification,
+    subscription_form: &YouTubeSubscription,
+) -> Result<(), ApiError> {
+    match verification.mode {
+        VerificationMode::Subscribe => {
+            let save_youtube_subscription_result = query!(
+                r#"
+                INSERT INTO subscriptions(id, channel_id, hmac_secret, callback_url, expires, post_shorts)
+                VALUES (?, ?, ?, ?, ?, ?);
+                "#,
+                uuid_str,
+                channel_id,
+                subscription_form.hmac_secret,
+                subscription_form.callback_url,
+                expires_at,
+                subscription_form.post_shorts,
+            )
+            .execute(&*pool)
+            .await?;
+
+            if save_youtube_subscription_result.rows_affected() != 1 {
+                return Err(ApiError::InternalError(format!(
+                    "save_form_data rows_affected error: {:?}",
+                    save_youtube_subscription_result
+                )));
+            }
+
+            Ok(())
+        }
+        VerificationMode::Unsubscribe => {
+            query!(
+                r#"
+                DELETE FROM 
+                    subscriptions
+                WHERE
+                    channel_id = ?;
+                "#,
+                channel_id
+            )
+            .execute(&*pool)
+            .await?;
+
+            Ok(())
+        }
+    }
 }
