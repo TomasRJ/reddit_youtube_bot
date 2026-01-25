@@ -7,3 +7,4 @@ mod server;
 mod shared;
 
 pub use server::{ApiError, serve};
+pub use shared::{SubCommand, subscribe_to_channel};

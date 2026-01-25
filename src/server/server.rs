@@ -1,4 +1,5 @@
 use axum::response::IntoResponse;
+use sqlx::migrate::MigrateError;
 use thiserror::Error;
 
 use utoipa::OpenApi;
@@ -6,15 +7,21 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_rapidoc::RapiDoc;
 
 use crate::{
-    infrastructure::{AppState, Settings},
-    server::{forms, frontend, google, reddit},
+    infrastructure::{AppState, Settings, handle_scheduler},
+    server::{forms, frontend, google, reddit, shared},
 };
+
+impl From<MigrateError> for ApiError {
+    fn from(error: MigrateError) -> Self {
+        ApiError::InternalError(format!("SQL Migration failed: {:?}", error))
+    }
+}
 
 #[derive(OpenApi)]
 #[openapi(
     paths(),
     components(schemas(
-        google::VerificationMode,
+        shared::VerificationMode,
         reddit::RedditCallbackErrors
     )),
     servers((url = "", description = "Reddit YouTube bot")),
@@ -23,7 +30,11 @@ pub struct ApiDoc;
 
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
 pub async fn serve(port: u16, app_settings: Settings) -> Result<(), ApiError> {
-    let state = AppState::new(app_settings).await;
+    let (state, scheduler_rx) = AppState::new(app_settings).await;
+
+    sqlx::migrate!().run(&state.db_pool).await?;
+
+    handle_scheduler(&state, scheduler_rx).await?;
 
     let (router, _api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .merge(frontend::router())
