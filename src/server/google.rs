@@ -137,6 +137,7 @@ pub struct Author {
         post,
         path = "/subscription/{id}",
         request_body(content = Feed, description = "Google PubSubHubbub XML request", content_type = "application/atom+xml"),
+        description = "New video published request from Google PubSubHubbub",
         params(
             ("X-Hub-Signature" = String, Header, description = "Google PubSubHubbub HMAC signature for the request body in the form of \"sha1=signature\" where the signature is a 40-byte, hexadecimal representation of a SHA1 signature. Source https://pubsubhubbub.github.io/PubSubHubbub/pubsubhubbub-core-0.4.html#rfc.section.8", example = "sha1=e7667dbb6b9dc356ac8dd767560926d5403be497"),
             ("id" = String, Path, description = "Subscription id", example = "019ba504-70f5-7f35-9c2c-2f02b992af7e")
