@@ -23,7 +23,8 @@ CREATE TABLE subscriptions (
     id TEXT NOT NULL PRIMARY KEY,
     channel_id TEXT NOT NULL,
     hmac_secret TEXT NOT NULL,
-    expires INTEGER NOT NULL,
+    callback_url TEXT NOT NULL,
+    expires INTEGER,
     post_shorts INTEGER NOT NULL
 );
 
