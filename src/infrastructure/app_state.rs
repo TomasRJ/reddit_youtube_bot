@@ -18,7 +18,7 @@ impl AppState {
             .expect("Error connecting to local SQLite DB.");
 
         let mut hb = Handlebars::new();
-        hb.register_template_file("whole_document", "src/frontend_templates/base_layout.html")
+        hb.register_template_file("whole_document", "frontend/base_layout.html")
             .expect("Error parsing base_layout template");
 
         Arc::new(Self { db_pool, hb })

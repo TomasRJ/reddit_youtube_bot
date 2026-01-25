@@ -38,7 +38,7 @@ impl From<handlebars::TemplateError> for ApiError {
 async fn main_landing_page(State(state): State<Arc<AppState>>) -> Result<Html<String>, ApiError> {
     let mut local_hb = state.hb.clone();
 
-    local_hb.register_template_file("body_content", "src/frontend_templates/landing_page.html")?;
+    local_hb.register_template_file("body_content", "frontend/landing_page.html")?;
 
     let whole_document = local_hb.render("whole_document", &{})?;
 
