@@ -1,6 +1,5 @@
 use std::{sync::Arc, time::Duration};
 
-use chrono::Utc;
 use sqlx::{Pool, Sqlite, query, query_scalar};
 use tokio::sync::mpsc::{self, Receiver};
 use tokio_stream::StreamExt;
@@ -17,15 +16,13 @@ pub async fn handle_scheduler(
 ) -> Result<(), ApiError> {
     tokio::spawn(run_subscription_worker(state.db_pool.clone(), receiver));
 
-    let subs_with_expiration = query_scalar!(
+    let subscriptions_exist = query_scalar!(
         r#"
         SELECT EXISTS (
             SELECT
                 s.channel_id
             FROM
                 subscriptions s
-            WHERE
-                s.expires IS NOT NULL
             LIMIT 1
         ) AS "result: bool";        
         "#,
@@ -33,37 +30,30 @@ pub async fn handle_scheduler(
     .fetch_one(&state.db_pool)
     .await?;
 
-    if !subs_with_expiration {
+    if !subscriptions_exist {
         return Ok(());
     }
 
-    let subscriptions_with_expiration = query!(
+    let subscriptions = query!(
         r#"
         SELECT
-            s.id,
-            s.expires as "expires_at!: i64"
+            s.callback_url,
+            s.channel_id,
+            s.hmac_secret
         FROM
-            subscriptions s
-        WHERE
-            s.expires IS NOT NULL;
+            subscriptions s;
         "#,
     )
     .fetch_all(&state.db_pool)
     .await?;
 
-    let now = Utc::now().timestamp();
-
-    for subscription in subscriptions_with_expiration {
-        let buffer = 3600; // 1 hour in seconds to resubscribe early
-        let wait_secs = (subscription.expires_at - now - buffer).max(3600);
-
-        let _ = state
-            .scheduler_sender
-            .send(SubCommand::Schedule {
-                subscription_id: subscription.id,
-                wait_secs,
-            })
-            .await;
+    for subscription in subscriptions {
+        subscribe_to_channel(
+            &subscription.callback_url,
+            &subscription.channel_id,
+            &subscription.hmac_secret,
+        )
+        .await?;
     }
 
     Ok(())
