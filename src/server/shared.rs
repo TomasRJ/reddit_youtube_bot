@@ -7,6 +7,7 @@ use utoipa::ToSchema;
 
 use crate::server::ApiError;
 
+// Structs
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RedditAuthorization {
     pub r#type: FormType,
@@ -16,19 +17,6 @@ pub struct RedditAuthorization {
     pub redirect_url: String,
     pub duration: RedditAuthorizeDuration,
     pub scopes: String,
-}
-
-#[derive(Serialize, Deserialize, ToSchema, DisplaySerde, Clone, Debug)]
-#[serde(rename_all = "lowercase")]
-pub enum RedditAuthorizeDuration {
-    Permanent,
-    Temporary,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub enum FormType {
-    Reddit,
-    Youtube,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -63,12 +51,41 @@ pub struct Verification {
     pub lease_seconds: Option<i64>,
 }
 
+// Enums
 #[derive(Deserialize, ToSchema, Debug)]
 pub enum VerificationMode {
     #[serde(rename = "subscribe")]
     Subscribe,
     #[serde(rename = "unsubscribe")]
     Unsubscribe,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, DisplaySerde, Clone, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum RedditAuthorizeDuration {
+    Permanent,
+    Temporary,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub enum FormType {
+    Reddit,
+    Youtube,
+}
+
+pub enum SubCommand {
+    Schedule {
+        subscription_id: String,
+        wait_secs: i64,
+    },
+}
+
+// Static vars
+static HTTP_CLIENT: OnceLock<Client> = OnceLock::new();
+
+// Functions
+pub fn get_http_client() -> &'static Client {
+    HTTP_CLIENT.get_or_init(Client::new)
 }
 
 pub fn extract_channel_id_from_topic_url(topic_url: &String) -> Result<&str, ApiError> {
@@ -82,19 +99,6 @@ pub fn extract_channel_id_from_topic_url(topic_url: &String) -> Result<&str, Api
             topic_url
         )))
     }
-}
-
-pub enum SubCommand {
-    Schedule {
-        subscription_id: String,
-        wait_secs: i64,
-    },
-}
-
-static HTTP_CLIENT: OnceLock<Client> = OnceLock::new();
-
-pub fn get_http_client() -> &'static Client {
-    HTTP_CLIENT.get_or_init(Client::new)
 }
 
 pub async fn subscribe_to_channel(
