@@ -26,7 +26,7 @@ pub struct Subscription {
 pub async fn get_subscription_details(
     pool: &Pool<Sqlite>,
     subscription_id: &String,
-) -> Result<Subscription, ApiError> {
+) -> Result<Option<Subscription>, ApiError> {
     let subscription = query_as!(
         Subscription,
         r#"
@@ -46,13 +46,7 @@ pub async fn get_subscription_details(
     .fetch_optional(&*pool)
     .await?;
 
-    match subscription {
-        Some(sub) => Ok(sub),
-        None => Err(ApiError::NotFound(format!(
-            "No subscription found for subscription id: {}",
-            subscription_id
-        ))),
-    }
+    Ok(subscription)
 }
 
 pub async fn save_form_data(
@@ -191,4 +185,34 @@ pub async fn handle_youtube_subscription(
             Ok(())
         }
     }
+}
+
+pub async fn update_youtube_subscription(
+    pool: &Pool<Sqlite>,
+    subscription_id: &String,
+    expires_at: &Option<i64>,
+) -> Result<(), ApiError> {
+    let update_youtube_subscription_result = query!(
+        r#"
+        UPDATE
+            subscriptions
+        SET
+            expires = ?
+        WHERE
+            id = ?;
+        "#,
+        expires_at,
+        subscription_id,
+    )
+    .execute(&*pool)
+    .await?;
+
+    if update_youtube_subscription_result.rows_affected() != 1 {
+        return Err(ApiError::InternalError(format!(
+            "update_youtube_subscription error: {:?}",
+            update_youtube_subscription_result
+        )));
+    }
+
+    Ok(())
 }

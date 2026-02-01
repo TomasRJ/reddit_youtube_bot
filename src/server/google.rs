@@ -14,7 +14,10 @@ use crate::{
     infrastructure::AppState,
     server::{
         ApiError, SubCommand,
-        repository::{fetch_form_data, get_subscription_details, handle_youtube_subscription},
+        repository::{
+            fetch_form_data, get_subscription_details, handle_youtube_subscription,
+            update_youtube_subscription,
+        },
         shared::{
             Verification, VerificationMode, YouTubeSubscription, extract_channel_id_from_topic_url,
         },
@@ -156,7 +159,13 @@ async fn new_video_published(
     headers: HeaderMap,
     body: String,
 ) -> Result<(), ApiError> {
-    let subscription = get_subscription_details(&state.db_pool, &subscription_id).await?;
+    let subscription = get_subscription_details(&state.db_pool, &subscription_id)
+        .await?
+        .ok_or(ApiError::BadRequest(format!(
+            "No subscription found for subscription id: {}",
+            subscription_id
+        )))?;
+
     let feed = Feed::validate(&subscription.hmac_secret, headers, body)?;
 
     // Shorts are only posted when the user has explicitly set post_shorts to true.
@@ -191,44 +200,58 @@ async fn subscription_verification(
     Path(subscription_id): Path<String>,
     Query(verification): Query<Verification>,
 ) -> Result<String, ApiError> {
-    let channel_id = extract_channel_id_from_topic_url(&verification.topic)?.to_string();
+    let subscription = get_subscription_details(&state.db_pool, &subscription_id).await?;
+    let expires_at = match verification.lease_seconds {
+        Some(wait_secs) => {
+            let buffer = 3600; // 1 hour in seconds to resubscribe early
 
-    println!(
-        "Received Google PubSubHubbub subscription verification request for YouTube channel: https://www.youtube.com/channel/{}",
-        &channel_id
-    );
+            // schedule the resubscription
+            let _ = state
+                .scheduler_sender
+                .send(SubCommand::Schedule {
+                    subscription_id: subscription_id.clone(),
+                    wait_secs: (wait_secs - buffer).max(3600),
+                })
+                .await;
 
-    let expires_at = if let Some(wait_secs) = verification.lease_seconds {
-        let buffer = 3600; // 1 hour in seconds to resubscribe early
-
-        // schedule the resubscription
-        let _ = state
-            .scheduler_sender
-            .send(SubCommand::Schedule {
-                subscription_id: subscription_id.clone(),
-                wait_secs: (wait_secs - buffer).max(0),
-            })
-            .await;
-
-        Some(Utc::now().timestamp() + wait_secs)
-    } else {
-        None
+            Some(Utc::now().timestamp() + wait_secs)
+        }
+        None => None,
     };
 
-    let subscription_form: YouTubeSubscription =
-        fetch_form_data(&state.db_pool, &subscription_id).await?;
+    match subscription {
+        Some(existing_sub) => {
+            println!(
+                "Received Google PubSubHubbub resubscription request for YouTube channel: https://www.youtube.com/channel/{}",
+                &existing_sub.channel_id
+            );
 
-    handle_youtube_subscription(
-        &state.db_pool,
-        &subscription_id,
-        &expires_at,
-        &channel_id,
-        &verification,
-        &subscription_form,
-    )
-    .await?;
+            update_youtube_subscription(&state.db_pool, &subscription_id, &expires_at).await?;
+        }
+        None => {
+            let channel_id = extract_channel_id_from_topic_url(&verification.topic)?.to_string();
 
-    println!("Google PubSubHubbub subscription verification request handled.");
+            println!(
+                "Received Google PubSubHubbub subscription verification request for YouTube channel: https://www.youtube.com/channel/{}",
+                &channel_id
+            );
+
+            let subscription_form: YouTubeSubscription =
+                fetch_form_data(&state.db_pool, &subscription_id).await?;
+
+            handle_youtube_subscription(
+                &state.db_pool,
+                &subscription_id,
+                &expires_at,
+                &channel_id,
+                &verification,
+                &subscription_form,
+            )
+            .await?;
+
+            println!("Google PubSubHubbub subscription verification request handled.");
+        }
+    }
 
     Ok(verification.challenge)
 }
