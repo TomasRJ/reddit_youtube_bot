@@ -13,7 +13,7 @@ use crate::{
 pub struct AppState {
     pub db_pool: SqlitePool,
     pub hb: Handlebars<'static>,
-    pub scheduler_sender: mpsc::Sender<SubCommand>, // Channel sender
+    pub scheduler_sender: mpsc::Sender<SubCommand>,
 }
 
 impl AppState {

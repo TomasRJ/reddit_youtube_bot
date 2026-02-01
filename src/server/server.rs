@@ -30,11 +30,11 @@ pub struct ApiDoc;
 
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
 pub async fn serve(port: u16, app_settings: Settings) -> Result<(), ApiError> {
-    let (state, scheduler_rx) = AppState::new(app_settings).await;
+    let (state, receiver) = AppState::new(app_settings).await;
 
     sqlx::migrate!().run(&state.db_pool).await?;
 
-    handle_scheduler(&state, scheduler_rx).await?;
+    handle_scheduler(&state, receiver).await?;
 
     let (router, _api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .merge(frontend::router())

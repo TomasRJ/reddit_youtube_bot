@@ -17,7 +17,7 @@ pub async fn handle_scheduler(
 ) -> Result<(), ApiError> {
     tokio::spawn(run_subscription_worker(state.db_pool.clone(), receiver));
 
-    let with_expiration_exists = query_scalar!(
+    let subs_with_expiration = query_scalar!(
         r#"
         SELECT EXISTS (
             SELECT
@@ -33,7 +33,7 @@ pub async fn handle_scheduler(
     .fetch_one(&state.db_pool)
     .await?;
 
-    if !with_expiration_exists {
+    if !subs_with_expiration {
         return Ok(());
     }
 
@@ -55,7 +55,7 @@ pub async fn handle_scheduler(
 
     for subscription in subscriptions_with_expiration {
         let buffer = 3600; // 1 hour in seconds to resubscribe early
-        let wait_secs = (subscription.expires_at - now - buffer).max(0);
+        let wait_secs = (subscription.expires_at - now - buffer).max(3600);
 
         let _ = state
             .scheduler_sender
@@ -75,7 +75,7 @@ pub async fn run_subscription_worker(pool: Pool<Sqlite>, mut receiver: mpsc::Rec
 
     loop {
         tokio::select! {
-            // Handles scheduling for new subscriptions with expiration
+            // Handles scheduling for subscriptions with expiration
             Some(cmd) = receiver.recv() => {
                 match cmd {
                     SubCommand::Schedule { subscription_id, wait_secs } => {
@@ -121,7 +121,7 @@ async fn subscribe_to_channel_via_subscription_id(
         info
     } else {
         return Err(ApiError::InternalError(format!(
-            "No subscription for for id: {}",
+            "No subscription found for id: {}",
             subscription_id,
         )));
     };
