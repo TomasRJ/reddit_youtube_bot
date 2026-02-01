@@ -12,7 +12,7 @@ use crate::{
     server::{
         ApiError,
         repository::{fetch_form_data, save_reddit_oauth_token},
-        shared::{RedditAuthorization, RedditOAuthToken},
+        shared::{RedditAuthorization, RedditOAuthToken, get_http_client},
     },
 };
 
@@ -31,7 +31,7 @@ impl From<uuid::Error> for ApiError {
 
 impl From<reqwest::Error> for ApiError {
     fn from(error: reqwest::Error) -> Self {
-        ApiError::BadRequest(format!("Web request failed: {}", error))
+        ApiError::InternalError(format!("Web request failed: {}", error))
     }
 }
 
@@ -104,9 +104,9 @@ async fn reddit_callback(
     let reddit_auth_form_data: RedditAuthorization =
         fetch_form_data(&state.db_pool, &state_uuid.to_string()).await?;
 
-    let client = reqwest::Client::new();
+    let client = get_http_client();
 
-    let oauth_token: RedditOAuthToken = client
+    let oauth_token = client
         .post("https://www.reddit.com/api/v1/access_token")
         .basic_auth(
             &reddit_auth_form_data.client_id,
@@ -119,8 +119,15 @@ async fn reddit_callback(
         ])
         .send()
         .await?
-        .json()
+        .text()
         .await?;
+
+    let oauth_token: RedditOAuthToken = serde_json::from_str(&oauth_token).map_err(|e| {
+        ApiError::BadRequest(format!(
+            "Error parsing Reddit OAuth token response body: {}. Response body was: {}. The form data was: {:?}",
+            e, oauth_token, reddit_auth_form_data
+        ))
+    })?;
 
     if !oauth_token.scope.contains("identity") {
         return Err(ApiError::BadRequest(
