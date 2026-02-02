@@ -20,7 +20,7 @@ pub async fn handle_scheduler(
         r#"
         SELECT EXISTS (
             SELECT
-                s.channel_id
+                s.id
             FROM
                 subscriptions s
             LIMIT 1
@@ -37,9 +37,7 @@ pub async fn handle_scheduler(
     let subscriptions = query!(
         r#"
         SELECT
-            s.callback_url,
-            s.channel_id,
-            s.hmac_secret
+            s.id
         FROM
             subscriptions s;
         "#,
@@ -48,12 +46,13 @@ pub async fn handle_scheduler(
     .await?;
 
     for subscription in subscriptions {
-        subscribe_to_channel(
-            &subscription.callback_url,
-            &subscription.channel_id,
-            &subscription.hmac_secret,
-        )
-        .await?;
+        let _ = state
+            .scheduler_sender
+            .send(SubCommand::Schedule {
+                subscription_id: subscription.id,
+                wait_secs: 5,
+            })
+            .await;
     }
 
     Ok(())
