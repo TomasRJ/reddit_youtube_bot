@@ -1,5 +1,6 @@
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 
+use chrono::{DateTime, Utc};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_textual::DisplaySerde;
@@ -13,7 +14,6 @@ pub struct RedditAuthorization {
     pub r#type: FormType,
     pub client_id: String,
     pub secret: String,
-    pub user_agent: String,
     pub redirect_url: String,
     pub duration: RedditAuthorizeDuration,
     pub scopes: String,
@@ -51,6 +51,72 @@ pub struct Verification {
     pub lease_seconds: Option<i64>,
 }
 
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct Feed {
+    #[serde(rename = "link")]
+    pub links: Vec<Link>,
+    pub title: String,
+    pub updated: DateTime<Utc>,
+    pub entry: Entry,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct Link {
+    #[serde(rename = "@rel")]
+    pub rel: String,
+    #[serde(rename = "@href")]
+    pub href: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct Entry {
+    pub id: String,
+    #[serde(rename = "videoId")]
+    pub yt_video_id: String,
+    #[serde(rename = "channelId")]
+    pub yt_channel_id: String,
+    pub title: String,
+    pub link: Link,
+    pub author: Author,
+    pub published: DateTime<Utc>,
+    pub updated: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct Author {
+    pub name: String,
+    pub uri: String,
+}
+pub struct RedditAccountDTO {
+    pub id: i64,
+    pub username: String,
+    pub client_id: String,
+    pub user_secret: String,
+    pub oauth_token: String,
+    pub expires_at: i64,
+}
+
+pub struct RedditAccount {
+    pub id: i64,
+    pub username: String,
+    pub oauth_token: RedditOAuthToken,
+}
+
+pub struct Subreddit {
+    pub id: i64,
+    pub name: String,
+    pub title_prefix: Option<String>,
+    pub title_suffix: Option<String>,
+    pub flair_id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct RedditSubmissionData {
+    pub url: String,
+    pub id: String,
+    pub name: String,
+}
+
 // Enums
 #[derive(Deserialize, ToSchema, Debug)]
 pub enum VerificationMode {
@@ -81,12 +147,12 @@ pub enum SubCommand {
 }
 
 // Static vars
-static HTTP_CLIENT: OnceLock<Client> = OnceLock::new();
-
-// Functions
-pub fn get_http_client() -> &'static Client {
-    HTTP_CLIENT.get_or_init(Client::new)
-}
+pub static HTTP_CLIENT: LazyLock<Client> = LazyLock::new(|| {
+    Client::builder()
+        .user_agent("reddit_youtube_bot v0.1.0 by Tomas R J. Source code: https://github.com/TomasRJ/reddit_youtube_bot")
+        .build()
+        .expect("Failed to create HTTP client")
+});
 
 pub fn extract_channel_id_from_topic_url(topic_url: &String) -> Result<&str, ApiError> {
     if let Some(("https://www.youtube.com/xml/feeds/videos.xml?channel_id", channel_id)) =
@@ -106,7 +172,7 @@ pub async fn subscribe_to_channel(
     channel_id: &String,
     hmac_secret: &String,
 ) -> Result<(), ApiError> {
-    let subscription_client = get_http_client();
+    let subscription_client = &HTTP_CLIENT;
 
     let topic_url = format!(
         "https://www.youtube.com/xml/feeds/videos.xml?channel_id={}",

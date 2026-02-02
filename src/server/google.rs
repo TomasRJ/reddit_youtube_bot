@@ -4,22 +4,24 @@ use axum::{
     extract::{Path, Query, State},
     http::HeaderMap,
 };
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use hmac::{Hmac, Mac, digest::crypto_common};
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::{
     infrastructure::AppState,
     server::{
         ApiError, SubCommand,
+        reddit::{get_associated_reddit_accounts_for_subscription, submit_video_to_subreddit},
         repository::{
-            fetch_form_data, get_subscription_details, handle_youtube_subscription,
-            update_youtube_subscription,
+            fetch_form_data, fetch_subreddits_for_reddit_account, get_subscription_details,
+            handle_youtube_subscription, save_reddit_submission, update_youtube_subscription,
+            video_already_submitted_to_subreddit,
         },
         shared::{
-            Verification, VerificationMode, YouTubeSubscription, extract_channel_id_from_topic_url,
+            Feed, Verification, VerificationMode, YouTubeSubscription,
+            extract_channel_id_from_topic_url,
         },
     },
 };
@@ -49,15 +51,6 @@ impl From<axum::http::header::ToStrError> for ApiError {
             error
         ))
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct Feed {
-    #[serde(rename = "link")]
-    pub links: Vec<Link>,
-    pub title: String,
-    pub updated: DateTime<Utc>,
-    pub entry: Entry,
 }
 
 type HmacSha1 = Hmac<sha1::Sha1>;
@@ -105,34 +98,6 @@ impl Feed {
             )),
         }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct Link {
-    #[serde(rename = "@rel")]
-    pub rel: String,
-    #[serde(rename = "@href")]
-    pub href: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct Entry {
-    pub id: String,
-    #[serde(rename = "videoId")]
-    pub yt_video_id: String,
-    #[serde(rename = "channelId")]
-    pub yt_channel_id: String,
-    pub title: String,
-    pub link: Link,
-    pub author: Author,
-    pub published: DateTime<Utc>,
-    pub updated: DateTime<Utc>,
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct Author {
-    pub name: String,
-    pub uri: String,
 }
 
 /// New video published
@@ -186,6 +151,83 @@ async fn new_video_published(
         return Ok(());
     }
 
+    let subscription_reddit_accounts =
+        get_associated_reddit_accounts_for_subscription(&state, &subscription.id).await?;
+
+    if subscription_reddit_accounts.is_empty() {
+        println!(
+            "The subscription: {} has no associated Reddit accounts to use for submit the video (title: '{}' link: {})",
+            subscription_id, feed.entry.title, feed.entry.link.href
+        );
+        return Ok(());
+    }
+
+    println!(
+        "Fetched {} associated reddit accounts for subscription: {}",
+        subscription_reddit_accounts.len(),
+        subscription.id
+    );
+
+    for reddit_account in subscription_reddit_accounts {
+        let reddit_account_id = reddit_account.id;
+
+        let reddit_account_subreddits =
+            fetch_subreddits_for_reddit_account(&state.db_pool, &reddit_account_id).await?;
+
+        if reddit_account_subreddits.is_empty() {
+            println!(
+                "The reddit account: {} has no associated subreddits to submit the video (title: '{}' link: {})",
+                reddit_account.username, feed.entry.title, feed.entry.link.href
+            );
+            continue;
+        }
+
+        println!(
+            "Fetched {} associated subreddits for reddit account: https://www.reddit.com/user/{}",
+            reddit_account_subreddits.len(),
+            reddit_account.username
+        );
+
+        for subreddit in reddit_account_subreddits {
+            if video_already_submitted_to_subreddit(
+                &state.db_pool,
+                &reddit_account_id,
+                &feed.entry.yt_video_id,
+            )
+            .await?
+            {
+                println!(
+                    "The video (title: '{}' link: {}) has been already submitted to the https://reddit.com/r/{} subreddit.",
+                    feed.entry.title, feed.entry.link.href, subreddit.name,
+                );
+                continue;
+            }
+
+            println!(
+                "Now submitting the new video (title: '{}' link: {}) to the following subreddit: {}",
+                feed.entry.title, feed.entry.link.href, subreddit.name
+            );
+
+            let reddit_submission =
+                submit_video_to_subreddit(&reddit_account, &subreddit, &feed.entry).await?;
+
+            println!(
+                "Reddit submission successful. URL: {}",
+                reddit_submission.url
+            );
+
+            save_reddit_submission(
+                &state.db_pool,
+                &reddit_submission,
+                &feed.entry.yt_video_id,
+                &subreddit.id,
+                &reddit_account_id,
+                &subscription.id,
+            )
+            .await?;
+        }
+    }
+
     Ok(())
 }
 
@@ -223,7 +265,7 @@ async fn subscription_verification(
                 .scheduler_sender
                 .send(SubCommand::Schedule {
                     subscription_id: subscription_id.clone(),
-                    wait_secs: (wait_secs - buffer).max(3600),
+                    wait_secs: (wait_secs - buffer).max(5),
                 })
                 .await;
 

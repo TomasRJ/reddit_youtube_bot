@@ -1,6 +1,7 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use axum::extract::{Query, State};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_textual::DisplaySerde;
 use utoipa::ToSchema;
@@ -11,8 +12,14 @@ use crate::{
     infrastructure::AppState,
     server::{
         ApiError,
-        repository::{fetch_form_data, save_reddit_oauth_token},
-        shared::{RedditAuthorization, RedditOAuthToken, get_http_client},
+        repository::{
+            fetch_form_data, fetch_reddit_accounts_for_subscription, save_reddit_account,
+            update_reddit_oauth_token,
+        },
+        shared::{
+            self, HTTP_CLIENT, RedditAccount, RedditAuthorization, RedditOAuthToken,
+            RedditSubmissionData, Subreddit,
+        },
     },
 };
 
@@ -104,7 +111,7 @@ async fn reddit_callback(
     let reddit_auth_form_data: RedditAuthorization =
         fetch_form_data(&state.db_pool, &state_uuid.to_string()).await?;
 
-    let client = get_http_client();
+    let client = &HTTP_CLIENT;
 
     let oauth_token = client
         .post("https://www.reddit.com/api/v1/access_token")
@@ -147,11 +154,11 @@ async fn reddit_callback(
         .map(|s| s.to_string())
         .ok_or({
             ApiError::InternalError(
-                "'name' field missing from reddit.com/api/v1/me response.".into(),
+                "'name' property missing from https://oauth.reddit.com/api/v1/me response.".into(),
             )
         })?;
 
-    save_reddit_oauth_token(
+    save_reddit_account(
         &state.db_pool,
         &reddit_user_name,
         &oauth_token,
@@ -160,4 +167,120 @@ async fn reddit_callback(
     .await?;
 
     Ok(())
+}
+
+pub async fn get_associated_reddit_accounts_for_subscription(
+    state: &Arc<AppState>,
+    subscription_id: &String,
+) -> Result<Vec<RedditAccount>, ApiError> {
+    let raw_reddit_accounts =
+        fetch_reddit_accounts_for_subscription(&state.db_pool, subscription_id).await?;
+    let mut reddit_accounts = Vec::new();
+
+    for reddit_account in raw_reddit_accounts {
+        let mut oauth_token: RedditOAuthToken = serde_json::from_str(&reddit_account.oauth_token)?;
+
+        if let Some(refresh_token) = &oauth_token.refresh_token
+            && Utc::now().timestamp() >= reddit_account.expires_at
+        {
+            println!(
+                "The OAuth token for https://www.reddit.com/user/{} has expired, refreshing token.",
+                reddit_account.username
+            );
+
+            oauth_token = refresh_reddit_oauth_token(
+                &reddit_account.client_id,
+                &reddit_account.user_secret,
+                refresh_token,
+            )
+            .await?;
+
+            update_reddit_oauth_token(&state.db_pool, &reddit_account.id, &oauth_token).await?;
+        }
+
+        reddit_accounts.push(RedditAccount {
+            id: reddit_account.id,
+            username: reddit_account.username.clone(),
+            oauth_token,
+        });
+    }
+
+    Ok(reddit_accounts)
+}
+
+pub async fn refresh_reddit_oauth_token(
+    client_id: &String,
+    user_secret: &String,
+    refresh_token: &String,
+) -> Result<RedditOAuthToken, ApiError> {
+    let client = &HTTP_CLIENT;
+
+    let oauth_token: RedditOAuthToken = client
+        .post("https://www.reddit.com/api/v1/access_token")
+        .basic_auth(client_id, Some(user_secret))
+        .form(&[
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refresh_token),
+        ])
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    Ok(oauth_token)
+}
+
+pub async fn submit_video_to_subreddit(
+    reddit_account: &RedditAccount,
+    subreddit: &Subreddit,
+    entry: &shared::Entry,
+) -> Result<RedditSubmissionData, ApiError> {
+    let title = format!(
+        "{prefix}{title}{suffix}",
+        prefix = &subreddit.title_prefix.clone().unwrap_or("".to_string()),
+        title = entry.title,
+        suffix = &subreddit.title_suffix.clone().unwrap_or("".to_string())
+    );
+
+    let mut submission_form = HashMap::from([
+        ("api_type", "json"),
+        ("extension", "json"),
+        ("kind", "link"),
+        ("resubmit", "true"),
+        ("sendreplies", "false"),
+        ("sr", &subreddit.name),
+        ("title", &title),
+        ("url", &entry.link.href),
+    ]);
+
+    if let Some(flair_id) = &subreddit.flair_id {
+        submission_form.insert("flair_id", &flair_id);
+    }
+
+    let client = &HTTP_CLIENT;
+
+    let submission_response = client
+        .post("https://oauth.reddit.com/api/submit")
+        .bearer_auth(reddit_account.oauth_token.access_token.clone())
+        .form(&submission_form)
+        .send()
+        .await?
+        .json::<serde_json::Value>()
+        .await?;
+
+    let submission_errors = submission_response["json"]["errors"].as_array();
+
+    if let Some(errors) = submission_errors
+        && !errors.is_empty()
+    {
+        return Err(ApiError::BadRequest(format!(
+            "The video (title: '{}' link: {}) from '{}' (link: {}) could not be submitted, got following errors: {:#?}",
+            title, entry.link.href, entry.author.name, entry.author.uri, errors
+        )));
+    }
+
+    let submission_data: RedditSubmissionData =
+        serde_json::from_value(submission_response["json"]["data"].clone())?;
+
+    Ok(submission_data)
 }

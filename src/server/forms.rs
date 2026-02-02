@@ -1,4 +1,7 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::HashSet,
+    sync::{Arc, LazyLock},
+};
 
 use axum::{Form, extract::State, response::Redirect};
 
@@ -34,27 +37,29 @@ impl From<serde_json::Error> for ApiError {
     }
 }
 
-const REDDIT_SCOPES: [&'static str; 19] = [
-    "identity",
-    "edit",
-    "flair",
-    "history",
-    "modconfig",
-    "modflair",
-    "modlog",
-    "modposts",
-    "modwiki",
-    "mysubreddits",
-    "privatemessages",
-    "read",
-    "report",
-    "save",
-    "submit",
-    "subscribe",
-    "vote",
-    "wikiedit",
-    "wikiread",
-];
+static REDDIT_SCOPES: LazyLock<HashSet<&str>> = LazyLock::new(|| {
+    HashSet::from([
+        "edit",
+        "flair",
+        "history",
+        "identity",
+        "modconfig",
+        "modflair",
+        "modlog",
+        "modposts",
+        "modwiki",
+        "mysubreddits",
+        "privatemessages",
+        "read",
+        "report",
+        "save",
+        "submit",
+        "subscribe",
+        "vote",
+        "wikiedit",
+        "wikiread",
+    ])
+});
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct RedditAuthorizeForm {
@@ -79,24 +84,27 @@ impl RedditAuthorizeForm {
             ));
         }
 
-        let reddit_scope_set: HashSet<&str> = REDDIT_SCOPES.into_iter().collect();
-        let mut seen = HashSet::new();
+        let mut input_scopes = HashSet::new();
 
-        for scope in scopes.split(',').filter(|s| !s.is_empty()) {
-            if !reddit_scope_set.contains(scope) {
+        for scope in scopes
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_lowercase())
+        {
+            if !&REDDIT_SCOPES.contains(scope.as_str()) {
                 return Err(ApiError::BadRequest(format!("Invalid scope: {}", scope)));
             }
 
-            if !seen.insert(scope) {
+            if !input_scopes.insert(scope.clone()) {
                 return Err(ApiError::BadRequest(format!("Duplicate scope: {}", scope)));
             }
         }
 
-        if seen.is_empty() {
+        if input_scopes.is_empty() {
             return Err(ApiError::BadRequest("No scopes provided".into()));
         }
 
-        if !seen.contains("identity") {
+        if !input_scopes.contains("identity") {
             return Err(ApiError::BadRequest("'identity' scope needed".into()));
         }
 
@@ -104,7 +112,6 @@ impl RedditAuthorizeForm {
             r#type: FormType::Reddit,
             client_id: client_id.to_string(),
             secret: secret.to_string(),
-            user_agent: "reddit_youtube_bot v0.1.0 by Tomas R J".to_string(),
             redirect_url: redirect_url.to_string(),
             duration: authorize_form_data.duration.clone(),
             scopes: scopes.to_string(),

@@ -78,6 +78,7 @@ CREATE TABLE submissions (
     subreddit_id INTEGER NOT NULL,
     reddit_account_id INTEGER NOT NULL,
     subscription_id TEXT NOT NULL,
+    time INTEGER NOT NULL DEFAULT (unixepoch()), -- for versions older than SQLite 3.38.0 (2022-02-22) use (cast(strftime('%s','now') as int))
     FOREIGN KEY (subreddit_id) REFERENCES subreddits(id) ON DELETE CASCADE,
     FOREIGN KEY (reddit_account_id) REFERENCES reddit_accounts(id) ON DELETE CASCADE,
     FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE

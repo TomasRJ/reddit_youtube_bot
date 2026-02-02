@@ -4,7 +4,8 @@ use sqlx::{Pool, Sqlite, query, query_as, query_scalar};
 use crate::server::{
     ApiError,
     shared::{
-        RedditAuthorization, RedditOAuthToken, Verification, VerificationMode, YouTubeSubscription,
+        RedditAccountDTO, RedditAuthorization, RedditOAuthToken, RedditSubmissionData, Subreddit,
+        Verification, VerificationMode, YouTubeSubscription,
     },
 };
 
@@ -102,13 +103,13 @@ where
     }
 }
 
-pub async fn save_reddit_oauth_token(
+pub async fn save_reddit_account(
     pool: &Pool<Sqlite>,
     username: &String,
     oauth_token: &RedditOAuthToken,
     reddit_auth_form_data: RedditAuthorization,
 ) -> Result<(), ApiError> {
-    let expires_at_timestamp = Utc::now().timestamp() + &oauth_token.expires_in;
+    let expires_at = Utc::now().timestamp() + &oauth_token.expires_in;
     let oauth_token_json_str = serde_json::to_string(&oauth_token)?;
 
     let save_reddit_oauth_token_result = query!(
@@ -120,7 +121,7 @@ pub async fn save_reddit_oauth_token(
         reddit_auth_form_data.client_id,
         reddit_auth_form_data.secret,
         oauth_token_json_str,
-        expires_at_timestamp,
+        expires_at,
     )
     .execute(&*pool)
     .await?;
@@ -211,6 +212,199 @@ pub async fn update_youtube_subscription(
         return Err(ApiError::InternalError(format!(
             "update_youtube_subscription error: {:?}",
             update_youtube_subscription_result
+        )));
+    }
+
+    Ok(())
+}
+
+pub async fn fetch_reddit_accounts_for_subscription(
+    pool: &Pool<Sqlite>,
+    subscription_id: &String,
+) -> Result<Vec<RedditAccountDTO>, ApiError> {
+    let subscription_has_reddit_account = query_scalar!(
+        r#"
+        SELECT EXISTS (
+            SELECT
+                sra.reddit_account_id
+            FROM
+                subscription_reddit_accounts sra
+            WHERE
+                sra.subscription_id = ?
+            LIMIT 1
+        ) AS "result: bool";        
+        "#,
+        subscription_id
+    )
+    .fetch_one(&*pool)
+    .await?;
+
+    if !subscription_has_reddit_account {
+        return Ok(vec![]);
+    }
+
+    let reddit_accounts = query_as!(
+        RedditAccountDTO,
+        r#"
+        SELECT
+            ra.id,
+            ra.username,
+            ra.client_id,
+            ra.user_secret,
+            ra.oauth_token,
+            ra.expires_at
+        FROM
+            reddit_accounts ra
+        INNER JOIN subscription_reddit_accounts sra ON
+            sra.reddit_account_id = ra.id
+        WHERE
+            sra.subscription_id = ?;
+        "#,
+        subscription_id
+    )
+    .fetch_all(&*pool)
+    .await?;
+
+    Ok(reddit_accounts)
+}
+
+pub async fn update_reddit_oauth_token(
+    pool: &Pool<Sqlite>,
+    reddit_account_id: &i64,
+    oauth_token: &RedditOAuthToken,
+) -> Result<(), ApiError> {
+    let expires_at = Utc::now().timestamp() + oauth_token.expires_in;
+    let oauth_token_json_str = serde_json::to_string(oauth_token)?;
+
+    let update_reddit_oauth_token_result = query!(
+        r#"
+        UPDATE
+            reddit_accounts
+        SET
+            oauth_token = ?,
+            expires_at = ?
+        WHERE
+            id = ?;
+        "#,
+        oauth_token_json_str,
+        expires_at,
+        reddit_account_id,
+    )
+    .execute(&*pool)
+    .await?;
+
+    if update_reddit_oauth_token_result.rows_affected() != 1 {
+        return Err(ApiError::InternalError(format!(
+            "update_reddit_oauth_token error: {:?}",
+            update_reddit_oauth_token_result
+        )));
+    }
+
+    Ok(())
+}
+
+pub async fn fetch_subreddits_for_reddit_account(
+    pool: &Pool<Sqlite>,
+    reddit_account_id: &i64,
+) -> Result<Vec<Subreddit>, ApiError> {
+    let reddit_account_has_subreddit = query_scalar!(
+        r#"
+        SELECT EXISTS (
+            SELECT
+                ras.subreddit_id
+            FROM
+                reddit_account_subreddits ras
+            WHERE
+                ras.reddit_account_id = ?
+            LIMIT 1
+        ) AS "result: bool";        
+        "#,
+        reddit_account_id
+    )
+    .fetch_one(&*pool)
+    .await?;
+
+    if !reddit_account_has_subreddit {
+        return Ok(vec![]);
+    }
+
+    let subreddits = query_as!(
+        Subreddit,
+        r#"
+        SELECT
+            s.id,
+            s.name,
+            s.title_prefix,
+            s.title_suffix,
+            s.flair_id
+        FROM
+            subreddits s
+        INNER JOIN reddit_account_subreddits ras ON
+            ras.subreddit_id = s.id
+        WHERE
+            ras.reddit_account_id = ?;
+        "#,
+        reddit_account_id
+    )
+    .fetch_all(&*pool)
+    .await?;
+
+    Ok(subreddits)
+}
+
+pub async fn video_already_submitted_to_subreddit(
+    pool: &Pool<Sqlite>,
+    subreddit_id: &i64,
+    video_id: &String,
+) -> Result<bool, ApiError> {
+    let is_already_submitted = query_scalar!(
+        r#"
+        SELECT EXISTS (
+            SELECT
+                s.id
+            FROM
+                submissions s
+            WHERE
+                s.subreddit_id = ?
+                AND s.video_id = ?
+            LIMIT 1
+        ) AS "result: bool";        
+        "#,
+        subreddit_id,
+        video_id
+    )
+    .fetch_one(&*pool)
+    .await?;
+
+    Ok(is_already_submitted)
+}
+
+pub async fn save_reddit_submission(
+    pool: &Pool<Sqlite>,
+    reddit_submission: &RedditSubmissionData,
+    video_id: &String,
+    subreddit_id: &i64,
+    reddit_account_id: &i64,
+    subscription_id: &String,
+) -> Result<(), ApiError> {
+    let save_reddit_submission_result = query!(
+        r#"
+        INSERT INTO submissions(id, video_id, subreddit_id, reddit_account_id, subscription_id)
+        VALUES (?, ?, ?, ?, ?);
+        "#,
+        reddit_submission.name,
+        video_id,
+        subreddit_id,
+        reddit_account_id,
+        subscription_id,
+    )
+    .execute(&*pool)
+    .await?;
+
+    if save_reddit_submission_result.rows_affected() != 1 {
+        return Err(ApiError::InternalError(format!(
+            "save_reddit_submission rows_affected error: {:?}",
+            save_reddit_submission_result
         )));
     }
 
