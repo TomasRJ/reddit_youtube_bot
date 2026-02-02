@@ -20,7 +20,7 @@ use crate::{
             video_already_submitted_to_subreddit,
         },
         shared::{
-            Feed, Verification, VerificationMode, YouTubeSubscription,
+            Author, Feed, HTTP_CLIENT, Verification, VerificationMode, YouTubeSubscription,
             extract_channel_id_from_topic_url,
         },
     },
@@ -294,11 +294,14 @@ async fn subscription_verification(
             let subscription_form: YouTubeSubscription =
                 fetch_form_data(&state.db_pool, &subscription_id).await?;
 
+            let subscription_data = fetch_subscription_data(&channel_id).await?;
+
             handle_youtube_subscription(
                 &state.db_pool,
                 &subscription_id,
                 &expires_at,
                 &channel_id,
+                &subscription_data.author.name,
                 &verification,
                 &subscription_form,
             )
@@ -309,4 +312,27 @@ async fn subscription_verification(
     }
 
     Ok(verification.challenge)
+}
+
+#[derive(serde::Deserialize)]
+struct SubscriptionData {
+    author: Author,
+}
+
+async fn fetch_subscription_data(channel_id: &String) -> Result<SubscriptionData, ApiError> {
+    let client = &HTTP_CLIENT;
+
+    let subscription_data = client
+        .get(format!(
+            "https://www.youtube.com/feeds/videos.xml?channel_id={}",
+            channel_id
+        ))
+        .send()
+        .await?
+        .text()
+        .await?;
+
+    let data: SubscriptionData = quick_xml::de::from_str(&subscription_data)?;
+
+    Ok(data)
 }

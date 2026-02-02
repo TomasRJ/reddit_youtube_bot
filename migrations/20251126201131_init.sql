@@ -22,6 +22,7 @@ CREATE INDEX session_user_id_index ON sessions (user_id);
 CREATE TABLE subscriptions (
     id TEXT NOT NULL PRIMARY KEY,
     channel_id TEXT NOT NULL,
+    channel_name TEXT NOT NULL,
     hmac_secret TEXT NOT NULL,
     callback_url TEXT NOT NULL,
     expires INTEGER,

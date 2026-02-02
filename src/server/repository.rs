@@ -15,10 +15,10 @@ impl From<sqlx::Error> for ApiError {
     }
 }
 
-#[allow(dead_code)]
 pub struct Subscription {
     pub id: String,
     pub channel_id: String,
+    pub channel_name: String,
     pub hmac_secret: String,
     pub expires: Option<i64>,
     pub post_shorts: bool,
@@ -34,6 +34,7 @@ pub async fn get_subscription_details(
         SELECT
             s.id,
             s.channel_id,
+            s.channel_name,
             s.hmac_secret,
             s.expires,
             s.post_shorts as "post_shorts: bool"
@@ -141,6 +142,7 @@ pub async fn handle_youtube_subscription(
     uuid_str: &String,
     expires_at: &Option<i64>,
     channel_id: &String,
+    channel_name: &String,
     verification: &Verification,
     subscription_form: &YouTubeSubscription,
 ) -> Result<(), ApiError> {
@@ -148,11 +150,12 @@ pub async fn handle_youtube_subscription(
         VerificationMode::Subscribe => {
             let save_youtube_subscription_result = query!(
                 r#"
-                INSERT INTO subscriptions(id, channel_id, hmac_secret, callback_url, expires, post_shorts)
-                VALUES (?, ?, ?, ?, ?, ?);
+                INSERT INTO subscriptions(id, channel_id, channel_name, hmac_secret, callback_url, expires, post_shorts)
+                VALUES (?, ?, ?, ?, ?, ?, ?);
                 "#,
                 uuid_str,
                 channel_id,
+                channel_name,
                 subscription_form.hmac_secret,
                 subscription_form.callback_url,
                 expires_at,
