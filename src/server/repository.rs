@@ -413,3 +413,45 @@ pub async fn save_reddit_submission(
 
     Ok(())
 }
+
+pub async fn fetch_subscriptions(pool: &Pool<Sqlite>) -> Result<Vec<Subscription>, ApiError> {
+    let subscription = query_as!(
+        Subscription,
+        r#"
+        SELECT
+            s.id,
+            s.channel_id,
+            s.channel_name,
+            s.hmac_secret,
+            s.expires,
+            s.post_shorts as "post_shorts: bool"
+        FROM
+            subscriptions s;
+        "#,
+    )
+    .fetch_all(&*pool)
+    .await?;
+
+    Ok(subscription)
+}
+
+pub async fn fetch_reddit_accounts(pool: &Pool<Sqlite>) -> Result<Vec<RedditAccountDTO>, ApiError> {
+    let subscription = query_as!(
+        RedditAccountDTO,
+        r#"
+        SELECT
+            ra.id,
+            ra.username,
+            ra.client_id,
+            ra.user_secret,
+            ra.oauth_token,
+            ra.expires_at
+        FROM
+            reddit_accounts ra;
+        "#,
+    )
+    .fetch_all(&*pool)
+    .await?;
+
+    Ok(subscription)
+}

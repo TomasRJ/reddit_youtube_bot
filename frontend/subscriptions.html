@@ -1,0 +1,23 @@
+<article class="mt-5 mx-0 p-4 col-lg-5 col-md-8 container-sm border border-black rounded">
+    <h4>Subscriptions</h4>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th scope="col">YouTube channel</th>
+                <th scope="col">Expires at</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#each subscriptions}}
+            <tr>
+                <td><a href="https://www.youtube.com/channel/{{this.channel_id}}">{{this.channel_name}}</a></td>
+                <td>{{this.expires_at}}</td>
+            </tr>
+            {{else}}
+            <tr>
+                <td colspan="2" class="empty">No Reddit accounts</td>
+            </tr>
+            {{/each}}
+        </tbody>
+    </table>
+</article>
