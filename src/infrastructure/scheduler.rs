@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use sqlx::{Pool, Sqlite, query, query_scalar};
-use tokio::sync::mpsc::{self, Receiver};
+use tokio::sync::mpsc::Receiver;
 use tokio_stream::StreamExt;
 use tokio_util::time::DelayQueue;
 
@@ -58,7 +58,7 @@ pub async fn handle_scheduler(
     Ok(())
 }
 
-pub async fn run_subscription_worker(pool: Pool<Sqlite>, mut receiver: mpsc::Receiver<SubCommand>) {
+pub async fn run_subscription_worker(pool: Pool<Sqlite>, mut receiver: Receiver<SubCommand>) {
     let mut queue = DelayQueue::new();
     println!("Subscription worker started.");
 
