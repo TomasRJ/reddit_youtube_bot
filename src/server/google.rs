@@ -167,6 +167,19 @@ async fn new_video_published(
         )))?;
 
     let feed = Feed::validate(&subscription.hmac_secret, headers, body)?;
+    println!(
+        "Received video request (title: '{}' link: {}) published from '{}' (link: {})",
+        feed.entry.title, feed.entry.link.href, feed.entry.author.name, feed.entry.author.uri
+    );
+
+    let published_diff = (feed.entry.updated - feed.entry.published).num_seconds();
+    if published_diff > 60 {
+        println!(
+            "Video was determined to be an update to an old video, not a new video upload. The time difference between the 'updated' and 'published' fields was: {}",
+            published_diff
+        );
+        return Ok(());
+    }
 
     // Shorts are only posted when the user has explicitly set post_shorts to true.
     if feed.entry.link.href.contains("shorts") && !subscription.post_shorts {
