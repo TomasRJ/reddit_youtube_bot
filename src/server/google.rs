@@ -16,8 +16,8 @@ use crate::{
         reddit::{get_associated_reddit_accounts_for_subscription, submit_video_to_subreddit},
         repository::{
             fetch_form_data, fetch_subreddits_for_reddit_account, get_subscription_details,
-            handle_youtube_subscription, save_reddit_submission, update_youtube_subscription,
-            video_already_submitted_to_subreddit,
+            handle_youtube_subscription, save_reddit_submission, save_subscription_submission,
+            update_youtube_subscription, video_already_submitted_to_subreddit,
         },
         shared::{
             Author, Feed, HTTP_CLIENT, Verification, VerificationMode, YouTubeSubscription,
@@ -218,13 +218,16 @@ async fn new_video_published(
 
             save_reddit_submission(
                 &state.db_pool,
-                &reddit_submission,
+                &reddit_submission.name,
                 &feed.entry.yt_video_id,
-                &subreddit.id,
                 &reddit_account_id,
-                &subscription.id,
+                &subreddit.id,
+                &Utc::now().timestamp(),
             )
             .await?;
+
+            save_subscription_submission(&state.db_pool, &subscription_id, &reddit_submission.name)
+                .await?;
         }
     }
 

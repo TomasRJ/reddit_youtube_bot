@@ -4,8 +4,8 @@ use sqlx::{Pool, Sqlite, query, query_as, query_scalar};
 use crate::server::{
     ApiError,
     shared::{
-        RedditAccountDTO, RedditAuthorization, RedditOAuthToken, RedditSubmissionData, Subreddit,
-        Verification, VerificationMode, YouTubeSubscription,
+        RedditAccountDTO, RedditAuthorization, RedditOAuthToken, Subreddit, Verification,
+        VerificationMode, YouTubeSubscription,
     },
 };
 
@@ -384,22 +384,22 @@ pub async fn video_already_submitted_to_subreddit(
 
 pub async fn save_reddit_submission(
     pool: &Pool<Sqlite>,
-    reddit_submission: &RedditSubmissionData,
+    reddit_submission_name: &String,
     video_id: &String,
-    subreddit_id: &i64,
     reddit_account_id: &i64,
-    subscription_id: &String,
+    subreddit_id: &i64,
+    timestamp: &i64,
 ) -> Result<(), ApiError> {
     let save_reddit_submission_result = query!(
         r#"
-        INSERT INTO submissions(id, video_id, subreddit_id, reddit_account_id, subscription_id)
+        INSERT INTO submissions(id, video_id, subreddit_id, reddit_account_id, created_at)
         VALUES (?, ?, ?, ?, ?);
         "#,
-        reddit_submission.name,
+        reddit_submission_name,
         video_id,
         subreddit_id,
         reddit_account_id,
-        subscription_id,
+        timestamp,
     )
     .execute(&*pool)
     .await?;
@@ -408,6 +408,32 @@ pub async fn save_reddit_submission(
         return Err(ApiError::InternalError(format!(
             "save_reddit_submission rows_affected error: {:?}",
             save_reddit_submission_result
+        )));
+    }
+
+    Ok(())
+}
+
+pub async fn save_subscription_submission(
+    pool: &Pool<Sqlite>,
+    subscription_id: &String,
+    reddit_submission_name: &String,
+) -> Result<(), ApiError> {
+    let save_subscription_submission_result = query!(
+        r#"
+        INSERT INTO subscription_submissions(subscription_id, submission_id)
+        VALUES (?, ?);
+        "#,
+        subscription_id,
+        reddit_submission_name,
+    )
+    .execute(&*pool)
+    .await?;
+
+    if save_subscription_submission_result.rows_affected() != 1 {
+        return Err(ApiError::InternalError(format!(
+            "save_subscription_submission rows_affected error: {:?}",
+            save_subscription_submission_result
         )));
     }
 
