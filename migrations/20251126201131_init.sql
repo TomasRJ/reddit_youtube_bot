@@ -43,6 +43,7 @@ CREATE TABLE reddit_accounts (
     username TEXT NOT NULL,
     client_id TEXT NOT NULL,
     user_secret TEXT NOT NULL,
+    moderate_submissions INTEGER NOT NULL,
     oauth_token TEXT NOT NULL,
     expires_at INTEGER NOT NULL
 );

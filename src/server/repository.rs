@@ -254,6 +254,7 @@ pub async fn fetch_reddit_accounts_for_subscription(
             ra.username,
             ra.client_id,
             ra.user_secret,
+            ra.moderate_submissions as "moderate_submissions: bool",
             ra.oauth_token,
             ra.expires_at
         FROM
@@ -470,6 +471,7 @@ pub async fn fetch_reddit_accounts(pool: &Pool<Sqlite>) -> Result<Vec<RedditAcco
             ra.username,
             ra.client_id,
             ra.user_secret,
+            ra.moderate_submissions as "moderate_submissions: bool",
             ra.oauth_token,
             ra.expires_at
         FROM
@@ -480,4 +482,64 @@ pub async fn fetch_reddit_accounts(pool: &Pool<Sqlite>) -> Result<Vec<RedditAcco
     .await?;
 
     Ok(subscription)
+}
+
+pub struct RedditSubmission {
+    pub id: String,
+    pub stickied: bool,
+}
+
+pub async fn fetch_submissions_on_subreddit(
+    pool: &Pool<Sqlite>,
+    subreddit_id: i64,
+) -> Result<Vec<RedditSubmission>, ApiError> {
+    let submissions = query_as!(
+        RedditSubmission,
+        r#"
+        SELECT
+            s.id,
+            s.stickied as "stickied: bool"
+        FROM
+            submissions s
+        WHERE
+            s.subreddit_id = ?
+        ORDER BY
+            s.created_at ASC;
+        "#,
+        subreddit_id
+    )
+    .fetch_all(&*pool)
+    .await?;
+
+    Ok(submissions)
+}
+
+pub async fn update_reddit_submission_sticky_state(
+    pool: &Pool<Sqlite>,
+    submission_id: &String,
+    state: &bool,
+) -> Result<(), ApiError> {
+    let update_reddit_submission_result = query!(
+        r#"
+        UPDATE
+            submissions
+        SET
+            stickied = ?
+        WHERE
+            id = ?;
+        "#,
+        state,
+        submission_id,
+    )
+    .execute(&*pool)
+    .await?;
+
+    if update_reddit_submission_result.rows_affected() != 1 {
+        return Err(ApiError::InternalError(format!(
+            "update_reddit_submission error: {:?}",
+            update_reddit_submission_result
+        )));
+    }
+
+    Ok(())
 }

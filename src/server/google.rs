@@ -13,7 +13,10 @@ use crate::{
     infrastructure::AppState,
     server::{
         ApiError, SubCommand,
-        reddit::{get_associated_reddit_accounts_for_subscription, submit_video_to_subreddit},
+        reddit::{
+            get_associated_reddit_accounts_for_subscription, moderate_submission,
+            submit_video_to_subreddit,
+        },
         repository::{
             fetch_form_data, fetch_subreddits_for_reddit_account, get_subscription_details,
             handle_youtube_subscription, save_reddit_submission, save_subscription_submission,
@@ -228,6 +231,10 @@ async fn new_video_published(
 
             save_subscription_submission(&state.db_pool, &subscription_id, &reddit_submission.name)
                 .await?;
+
+            if reddit_account.moderate_submissions {
+                moderate_submission(&state, &reddit_account, &subreddit).await?;
+            }
         }
     }
 

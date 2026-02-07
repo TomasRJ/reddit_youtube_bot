@@ -4,6 +4,7 @@ use axum::extract::{Query, State};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_textual::DisplaySerde;
+use sqlx::{Pool, Sqlite};
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 use uuid::Uuid;
@@ -13,8 +14,9 @@ use crate::{
     server::{
         ApiError,
         repository::{
-            fetch_form_data, fetch_reddit_accounts_for_subscription, save_reddit_account,
-            update_reddit_oauth_token,
+            fetch_form_data, fetch_reddit_accounts_for_subscription,
+            fetch_submissions_on_subreddit, save_reddit_account, update_reddit_oauth_token,
+            update_reddit_submission_sticky_state,
         },
         shared::{
             self, HTTP_CLIENT, RedditAccount, RedditAuthorization, RedditOAuthToken,
@@ -202,6 +204,7 @@ pub async fn get_associated_reddit_accounts_for_subscription(
             id: reddit_account.id,
             username: reddit_account.username.clone(),
             oauth_token,
+            moderate_submissions: reddit_account.moderate_submissions,
         });
     }
 
@@ -283,4 +286,86 @@ pub async fn submit_video_to_subreddit(
         serde_json::from_value(submission_response["json"]["data"].clone())?;
 
     Ok(submission_data)
+}
+
+pub async fn moderate_submission(
+    state: &Arc<AppState>,
+    reddit_account: &RedditAccount,
+    subreddit: &Subreddit,
+) -> Result<(), ApiError> {
+    let subreddit_submissions =
+        fetch_submissions_on_subreddit(&state.db_pool, subreddit.id).await?;
+
+    if subreddit_submissions.is_empty() {
+        println!(
+            "The Reddit account https://www.reddit.com/u/{} has no submissions on the https://www.reddit.com/r/{} subreddit.",
+            reddit_account.username, subreddit.name
+        );
+        return Ok(());
+    }
+
+    // subreddit_submissions is ordered by timestamp ascending
+    let oldest_stickied_submission = subreddit_submissions.iter().find(|s| s.stickied);
+
+    let previous_submission = subreddit_submissions
+        .iter()
+        .filter(|s| !s.stickied)
+        .rev() // Start from the end (the newest)
+        .nth(1); // Skip index 0 (the last), take index 1 (the previous submission)
+
+    let (oldest_stickied_submission, previous_submission) = if let Some(old) =
+        oldest_stickied_submission
+        && let Some(prev) = previous_submission
+    {
+        (old, prev)
+    } else {
+        println!(
+            "The Reddit account https://www.reddit.com/u/{} has no submission on the https://www.reddit.com/r/{} subreddit.",
+            reddit_account.username, subreddit.name
+        );
+        return Ok(());
+    };
+
+    set_reddit_submission_sticky_state(&state.db_pool, &oldest_stickied_submission.id, &false)
+        .await?;
+    set_reddit_submission_sticky_state(&state.db_pool, &previous_submission.id, &true).await?;
+
+    Ok(())
+}
+
+async fn set_reddit_submission_sticky_state(
+    pool: &Pool<Sqlite>,
+    submission_id: &String,
+    state: &bool,
+) -> Result<(), ApiError> {
+    let client = &HTTP_CLIENT;
+
+    let sticky_response = client
+        .post("https://oauth.reddit.com/api/set_subreddit_sticky")
+        .form(&[
+            ("api_type", "json"),
+            ("id", submission_id),
+            ("state", &state.to_string()),
+        ])
+        .send()
+        .await?
+        .json::<serde_json::Value>()
+        .await?;
+
+    let sticky_errors = sticky_response["json"]["errors"].as_array();
+
+    if let Some(errors) = sticky_errors
+        && !errors.is_empty()
+    {
+        return Err(ApiError::BadRequest(format!(
+            "Got following errors while trying to change the submissions (link: https://redd.it/{}) sticky state ({}): {:#?}",
+            &submission_id[3..],
+            state,
+            errors
+        )));
+    }
+
+    update_reddit_submission_sticky_state(&pool, &submission_id, &state).await?;
+
+    Ok(())
 }

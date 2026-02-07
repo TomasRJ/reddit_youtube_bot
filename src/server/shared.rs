@@ -92,6 +92,7 @@ pub struct RedditAccountDTO {
     pub username: String,
     pub client_id: String,
     pub user_secret: String,
+    pub moderate_submissions: bool,
     pub oauth_token: String,
     pub expires_at: i64,
 }
@@ -100,6 +101,7 @@ pub struct RedditAccount {
     pub id: i64,
     pub username: String,
     pub oauth_token: RedditOAuthToken,
+    pub moderate_submissions: bool,
 }
 
 pub struct Subreddit {
