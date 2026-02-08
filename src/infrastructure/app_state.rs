@@ -6,7 +6,7 @@ use tokio::sync::mpsc;
 
 use crate::{
     infrastructure::{connect::get_pool, settings::Settings},
-    server::SubCommand,
+    server::{RedditCredentials, SubCommand},
 };
 
 #[derive(Clone)]
@@ -14,6 +14,7 @@ pub struct AppState {
     pub db_pool: SqlitePool,
     pub hb: Handlebars<'static>,
     pub scheduler_sender: mpsc::Sender<SubCommand>,
+    pub reddit_credentials: RedditCredentials,
 }
 
 impl AppState {
@@ -28,11 +29,14 @@ impl AppState {
 
         let (scheduler_sender, scheduler_receiver) = mpsc::channel(100);
 
+        let reddit_credentials = settings.reddit_credentials;
+
         (
             Arc::new(Self {
                 db_pool,
                 hb,
                 scheduler_sender,
+                reddit_credentials,
             }),
             scheduler_receiver,
         )

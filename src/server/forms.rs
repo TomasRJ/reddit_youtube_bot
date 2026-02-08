@@ -63,9 +63,6 @@ static REDDIT_SCOPES: LazyLock<HashSet<&str>> = LazyLock::new(|| {
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct RedditAuthorizeForm {
-    pub client_id: String,
-    pub secret: String,
-    pub redirect_url: String,
     pub duration: RedditAuthorizeDuration,
     pub scopes: String,
 }
@@ -73,12 +70,8 @@ pub struct RedditAuthorizeForm {
 impl RedditAuthorizeForm {
     fn validate(authorize_form_data: &Self) -> Result<RedditAuthorization, ApiError> {
         let scopes = authorize_form_data.scopes.trim().trim_matches(',').trim();
-        let client_id = authorize_form_data.client_id.trim();
-        let redirect_url = authorize_form_data.redirect_url.trim();
-        let secret = authorize_form_data.secret.trim();
 
-        if client_id.is_empty() || redirect_url.is_empty() || scopes.is_empty() || secret.is_empty()
-        {
+        if scopes.is_empty() {
             return Err(ApiError::BadRequest(
                 "client_id, redirect_url or scope input was empty".into(),
             ));
@@ -110,9 +103,6 @@ impl RedditAuthorizeForm {
 
         Ok(RedditAuthorization {
             r#type: FormType::Reddit,
-            client_id: client_id.to_string(),
-            secret: secret.to_string(),
-            redirect_url: redirect_url.to_string(),
             duration: authorize_form_data.duration.clone(),
             scopes: scopes.to_string(),
         })
@@ -150,9 +140,9 @@ async fn reddit_authorize_submission(
 
     let authorize_url = format!(
         "https://www.reddit.com/api/v1/authorize?client_id={client_id}&response_type=code&state={state_string}&redirect_uri={redirect_url}&duration={duration}&scope={scope_string}",
-        client_id = reddit_authorization.client_id,
+        client_id = state.reddit_credentials.client_id,
         state_string = uuid,
-        redirect_url = reddit_authorization.redirect_url,
+        redirect_url = state.reddit_credentials.redirect_url,
         duration = reddit_authorization.duration,
         scope_string = reddit_authorization.scopes
     );

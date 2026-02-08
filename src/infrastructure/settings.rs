@@ -1,11 +1,13 @@
 use std::env::{self, VarError};
 
-use serde::Deserialize;
 use thiserror::Error;
 
-#[derive(Debug, Clone, Deserialize)]
+use crate::server::RedditCredentials;
+
+#[derive(Debug, Clone)]
 pub struct Settings {
     pub database_url: String,
+    pub reddit_credentials: RedditCredentials,
 }
 
 impl Settings {
@@ -14,6 +16,11 @@ impl Settings {
 
         Ok(Self {
             database_url: env::var("DATABASE_URL")?,
+            reddit_credentials: RedditCredentials {
+                client_id: env::var("CLIENT_ID")?,
+                client_secret: env::var("CLIENT_SECRET")?,
+                redirect_url: env::var("REDIRECT_URL")?,
+            },
         })
     }
 }

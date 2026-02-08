@@ -123,13 +123,13 @@ async fn reddit_callback(
     let oauth_token = client
         .post("https://www.reddit.com/api/v1/access_token")
         .basic_auth(
-            &reddit_auth_form_data.client_id,
-            Some(&reddit_auth_form_data.secret),
+            &state.reddit_credentials.client_id,
+            Some(&state.reddit_credentials.client_secret),
         )
         .form(&[
             ("grant_type", "authorization_code"),
             ("code", &callback.code),
-            ("redirect_uri", &reddit_auth_form_data.redirect_url),
+            ("redirect_uri", &state.reddit_credentials.redirect_url),
         ])
         .send()
         .await?
@@ -169,20 +169,16 @@ async fn reddit_callback(
             )
         })?;
 
-    let reddit_account_id = save_reddit_account(
-        &state.db_pool,
-        &reddit_user_name,
-        &oauth_token,
-        &reddit_auth_form_data,
-    )
-    .await?;
+    let reddit_account_id =
+        save_reddit_account(&state.db_pool, &reddit_user_name, &oauth_token).await?;
 
     println!("Reddit account data saved to db, now handling previous Reddit submissions.");
 
     handle_previous_reddit_submissions(&state.db_pool, &reddit_account_id, &reddit_user_name)
         .await?;
 
-    let home_url = match reddit_auth_form_data
+    let home_url = match state
+        .reddit_credentials
         .redirect_url
         .split_once("reddit/callback")
     {
@@ -358,12 +354,7 @@ pub async fn get_associated_reddit_accounts_for_subscription(
                 reddit_account.username
             );
 
-            oauth_token = refresh_reddit_oauth_token(
-                &reddit_account.client_id,
-                &reddit_account.user_secret,
-                refresh_token,
-            )
-            .await?;
+            oauth_token = refresh_reddit_oauth_token(&state, refresh_token).await?;
 
             update_reddit_oauth_token(&state.db_pool, &reddit_account.id, &oauth_token).await?;
         }
@@ -380,15 +371,17 @@ pub async fn get_associated_reddit_accounts_for_subscription(
 }
 
 pub async fn refresh_reddit_oauth_token(
-    client_id: &String,
-    user_secret: &String,
+    state: &Arc<AppState>,
     refresh_token: &String,
 ) -> Result<RedditOAuthToken, ApiError> {
     let client = &HTTP_CLIENT;
 
     let oauth_token: RedditOAuthToken = client
         .post("https://www.reddit.com/api/v1/access_token")
-        .basic_auth(client_id, Some(user_secret))
+        .basic_auth(
+            &state.reddit_credentials.client_id,
+            Some(&state.reddit_credentials.client_secret),
+        )
         .form(&[
             ("grant_type", "refresh_token"),
             ("refresh_token", refresh_token),

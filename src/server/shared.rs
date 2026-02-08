@@ -9,12 +9,16 @@ use utoipa::ToSchema;
 use crate::server::ApiError;
 
 // Structs
+#[derive(Debug, Clone)]
+pub struct RedditCredentials {
+    pub client_id: String,
+    pub client_secret: String,
+    pub redirect_url: String,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RedditAuthorization {
     pub r#type: FormType,
-    pub client_id: String,
-    pub secret: String,
-    pub redirect_url: String,
     pub duration: RedditAuthorizeDuration,
     pub scopes: String,
 }
@@ -90,8 +94,6 @@ pub struct Author {
 pub struct RedditAccountDTO {
     pub id: i64,
     pub username: String,
-    pub client_id: String,
-    pub user_secret: String,
     pub moderate_submissions: bool,
     pub oauth_token: String,
     pub expires_at: i64,

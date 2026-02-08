@@ -4,8 +4,8 @@ use sqlx::{Pool, Sqlite, query, query_as, query_scalar};
 use crate::server::{
     ApiError,
     shared::{
-        RedditAccountDTO, RedditAuthorization, RedditOAuthToken, Subreddit, Verification,
-        VerificationMode, YouTubeSubscription,
+        RedditAccountDTO, RedditOAuthToken, Subreddit, Verification, VerificationMode,
+        YouTubeSubscription,
     },
 };
 
@@ -108,19 +108,16 @@ pub async fn save_reddit_account(
     pool: &Pool<Sqlite>,
     username: &String,
     oauth_token: &RedditOAuthToken,
-    reddit_auth_form_data: &RedditAuthorization,
 ) -> Result<i64, ApiError> {
     let expires_at = Utc::now().timestamp() + &oauth_token.expires_in;
     let oauth_token_json_str = serde_json::to_string(&oauth_token)?;
 
     let save_reddit_oauth_token_result = query!(
         r#"
-        INSERT INTO reddit_accounts(username, client_id, user_secret, oauth_token, expires_at)
-        VALUES (?, ?, ?, ?, ?);
+        INSERT INTO reddit_accounts(username, oauth_token, expires_at)
+        VALUES (?, ?, ?);
         "#,
         username,
-        reddit_auth_form_data.client_id,
-        reddit_auth_form_data.secret,
         oauth_token_json_str,
         expires_at,
     )
@@ -252,8 +249,6 @@ pub async fn fetch_reddit_accounts_for_subscription(
         SELECT
             ra.id,
             ra.username,
-            ra.client_id,
-            ra.user_secret,
             ra.moderate_submissions as "moderate_submissions: bool",
             ra.oauth_token,
             ra.expires_at
@@ -471,8 +466,6 @@ pub async fn fetch_reddit_accounts(pool: &Pool<Sqlite>) -> Result<Vec<RedditAcco
         SELECT
             ra.id,
             ra.username,
-            ra.client_id,
-            ra.user_secret,
             ra.moderate_submissions as "moderate_submissions: bool",
             ra.oauth_token,
             ra.expires_at
