@@ -101,7 +101,7 @@ pub enum RedditCallbackErrors {
         path = "/callback",
         description = "Reddit authorize URL redirect used to retrieve the Reddit OAuth token for a given Reddit account.",
         responses(
-            (status = 200, description = "Reddit OAuth token received and stored."),
+            (status = 303, description = "Reddit OAuth token successfully received and previous Reddit submissions handled"),
             (status = 400, description = "Invalid form data."),
             (status = 500, description = "Internal server error."),
         ),

@@ -192,7 +192,7 @@ impl YouTubeSubscribeForm {
         path = "/subscribe",
         description = "Subscribe to a YouTube channel via form input",
         responses(
-            (status = 200, description = "Successfully subscribed to Youtube channel."),
+            (status = 303, description = "Successfully subscribed to Youtube channel redirect to home page."),
             (status = 400, description = "Invalid form data."),
             (status = 500, description = "Internal server error."),
         ),
