@@ -15,7 +15,7 @@ use uuid::Uuid;
 use crate::{
     infrastructure::AppState,
     server::{
-        ApiError,
+        ApiError, RedditCredentials,
         repository::{
             fetch_form_data, fetch_reddit_accounts_for_subscription,
             fetch_submissions_on_subreddit, get_or_create_subreddit, save_reddit_account,
@@ -174,8 +174,7 @@ async fn reddit_callback(
 
     println!("Reddit account data saved to db, now handling previous Reddit submissions.");
 
-    handle_previous_reddit_submissions(&state.db_pool, &reddit_account_id, &reddit_user_name)
-        .await?;
+    handle_previous_reddit_submissions(&state, &reddit_account_id, &reddit_user_name).await?;
 
     let home_url = match state
         .reddit_credentials
@@ -190,14 +189,17 @@ async fn reddit_callback(
 }
 
 async fn handle_previous_reddit_submissions(
-    pool: &Pool<Sqlite>,
+    state: &Arc<AppState>,
     reddit_account_id: &i64,
     reddit_user_name: &String,
 ) -> Result<(), ApiError> {
-    let reddit_account_submissions = fetch_reddit_account_submissions(format!(
-        "https://www.reddit.com/user/{}/submitted.json",
-        reddit_user_name
-    ))
+    let reddit_account_submissions = fetch_reddit_account_submissions(
+        &state.reddit_credentials,
+        format!(
+            "https://www.reddit.com/user/{}/submitted.json",
+            reddit_user_name
+        ),
+    )
     .await?;
 
     let mut submission_data = reddit_account_submissions.data;
@@ -207,10 +209,13 @@ async fn handle_previous_reddit_submissions(
     let mut next_page_token = reddit_account_submissions.next_page_token;
 
     while let Some(token) = next_page_token {
-        let new_submission_data = fetch_reddit_account_submissions(format!(
-            "https://www.reddit.com/user/{}/submitted.json?after={}",
-            reddit_user_name, token
-        ))
+        let new_submission_data = fetch_reddit_account_submissions(
+            &state.reddit_credentials,
+            format!(
+                "https://www.reddit.com/user/{}/submitted.json?after={}",
+                reddit_user_name, token
+            ),
+        )
         .await?;
 
         next_page_token = new_submission_data.next_page_token;
@@ -234,9 +239,12 @@ async fn handle_previous_reddit_submissions(
     );
 
     for submission in filtered_submissions {
-        let subreddit =
-            get_or_create_subreddit(&pool, &submission.subreddit_name, &submission.flair_id)
-                .await?;
+        let subreddit = get_or_create_subreddit(
+            &state.db_pool,
+            &submission.subreddit_name,
+            &submission.flair_id,
+        )
+        .await?;
         let timestamp = submission.created_utc.round() as i64;
         let video_id = youtube_url_to_video_id(&submission.url);
 
@@ -251,7 +259,7 @@ async fn handle_previous_reddit_submissions(
         };
 
         save_reddit_submission(
-            &pool,
+            &state.db_pool,
             &submission.id,
             &video_id,
             &reddit_account_id,
@@ -309,11 +317,18 @@ pub struct SubmissionJsonData {
     pub stickied: bool,
 }
 
-async fn fetch_reddit_account_submissions(url: String) -> Result<RedditSubmissionJson, ApiError> {
+async fn fetch_reddit_account_submissions(
+    reddit_credentials: &RedditCredentials,
+    url: String,
+) -> Result<RedditSubmissionJson, ApiError> {
     let client = &HTTP_CLIENT;
 
     let reddit_submissions = client
         .get(url)
+        .basic_auth(
+            &reddit_credentials.client_id,
+            Some(&reddit_credentials.client_secret),
+        )
         .send()
         .await?
         .json::<serde_json::Value>()
