@@ -13,7 +13,6 @@ use crate::server::ApiError;
 pub struct RedditCredentials {
     pub client_id: String,
     pub client_secret: String,
-    pub redirect_url: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -39,7 +38,6 @@ pub struct YouTubeSubscription {
     pub topic_url: String,
     pub channel_id: String,
     pub hmac_secret: String,
-    pub callback_url: String,
     pub post_shorts: bool,
 }
 

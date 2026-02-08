@@ -8,6 +8,7 @@ use crate::server::RedditCredentials;
 pub struct Settings {
     pub database_url: String,
     pub reddit_credentials: RedditCredentials,
+    pub base_url: String,
 }
 
 impl Settings {
@@ -19,8 +20,8 @@ impl Settings {
             reddit_credentials: RedditCredentials {
                 client_id: env::var("CLIENT_ID")?,
                 client_secret: env::var("CLIENT_SECRET")?,
-                redirect_url: env::var("REDIRECT_URL")?,
             },
+            base_url: env::var("BASE_URL")?,
         })
     }
 }

@@ -129,7 +129,10 @@ async fn reddit_callback(
         .form(&[
             ("grant_type", "authorization_code"),
             ("code", &callback.code),
-            ("redirect_uri", &state.reddit_credentials.redirect_url),
+            (
+                "redirect_uri",
+                &format!("{}/reddit/callback", &state.base_url),
+            ),
         ])
         .send()
         .await?
@@ -176,16 +179,7 @@ async fn reddit_callback(
 
     handle_previous_reddit_submissions(&state, &reddit_account_id, &reddit_user_name).await?;
 
-    let home_url = match state
-        .reddit_credentials
-        .redirect_url
-        .split_once("reddit/callback")
-    {
-        Some((url, _)) => Some(url),
-        None => None,
-    };
-
-    Ok(Redirect::to(home_url.unwrap_or("/")))
+    Ok(Redirect::to(&state.base_url))
 }
 
 async fn handle_previous_reddit_submissions(

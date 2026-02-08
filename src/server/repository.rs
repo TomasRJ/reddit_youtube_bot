@@ -147,14 +147,13 @@ pub async fn handle_youtube_subscription(
         VerificationMode::Subscribe => {
             let save_youtube_subscription_result = query!(
                 r#"
-                INSERT INTO subscriptions(id, channel_id, channel_name, hmac_secret, callback_url, expires, post_shorts)
-                VALUES (?, ?, ?, ?, ?, ?, ?);
+                INSERT INTO subscriptions(id, channel_id, channel_name, hmac_secret, expires, post_shorts)
+                VALUES (?, ?, ?, ?, ?, ?);
                 "#,
                 uuid_str,
                 channel_id,
                 channel_name,
                 subscription_form.hmac_secret,
-                subscription_form.callback_url,
                 expires_at,
                 subscription_form.post_shorts,
             )

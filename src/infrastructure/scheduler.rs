@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use sqlx::{Pool, Sqlite, query, query_scalar};
+use sqlx::{query, query_scalar};
 use tokio::sync::mpsc::Receiver;
 use tokio_stream::StreamExt;
 use tokio_util::time::DelayQueue;
@@ -14,7 +14,7 @@ pub async fn handle_scheduler(
     state: &Arc<AppState>,
     receiver: Receiver<SubCommand>,
 ) -> Result<(), ApiError> {
-    tokio::spawn(run_subscription_worker(state.db_pool.clone(), receiver));
+    tokio::spawn(run_subscription_worker(state.clone(), receiver));
 
     let subscriptions_exist = query_scalar!(
         r#"
@@ -58,7 +58,7 @@ pub async fn handle_scheduler(
     Ok(())
 }
 
-pub async fn run_subscription_worker(pool: Pool<Sqlite>, mut receiver: Receiver<SubCommand>) {
+pub async fn run_subscription_worker(state: Arc<AppState>, mut receiver: Receiver<SubCommand>) {
     let mut queue = DelayQueue::new();
     println!("Subscription worker started.");
 
@@ -78,7 +78,7 @@ pub async fn run_subscription_worker(pool: Pool<Sqlite>, mut receiver: Receiver<
                 let subscription_id = expired.into_inner();
                 println!("Executing resubscribe for: {}", subscription_id);
 
-                if let Err(e) = subscribe_to_channel_via_subscription_id(&pool, &subscription_id).await {
+                if let Err(e) = subscribe_to_channel_via_subscription_id(&state, &subscription_id).await {
                     eprintln!("Resubscribe error for {}: {:?}", subscription_id, e);
                 }
             }
@@ -87,13 +87,12 @@ pub async fn run_subscription_worker(pool: Pool<Sqlite>, mut receiver: Receiver<
 }
 
 async fn subscribe_to_channel_via_subscription_id(
-    pool: &Pool<Sqlite>,
+    state: &Arc<AppState>,
     subscription_id: &String,
 ) -> Result<(), ApiError> {
     let subscription = query!(
         r#"
         SELECT
-            s.callback_url,
             s.channel_id,
             s.hmac_secret
         FROM
@@ -103,7 +102,7 @@ async fn subscribe_to_channel_via_subscription_id(
         "#,
         subscription_id
     )
-    .fetch_optional(&*pool)
+    .fetch_optional(&state.db_pool)
     .await?;
 
     let subscription = if let Some(info) = subscription {
@@ -116,7 +115,10 @@ async fn subscribe_to_channel_via_subscription_id(
     };
 
     subscribe_to_channel(
-        &subscription.callback_url,
+        &format!(
+            "{}/google/subscription/{}",
+            &state.base_url, subscription_id
+        ),
         &subscription.channel_id,
         &subscription.hmac_secret,
     )

@@ -142,7 +142,7 @@ async fn reddit_authorize_submission(
         "https://www.reddit.com/api/v1/authorize?client_id={client_id}&response_type=code&state={state_string}&redirect_uri={redirect_url}&duration={duration}&scope={scope_string}",
         client_id = state.reddit_credentials.client_id,
         state_string = uuid,
-        redirect_url = state.reddit_credentials.redirect_url,
+        redirect_url = format!("{}/reddit/callback", &state.base_url),
         duration = reddit_authorization.duration,
         scope_string = reddit_authorization.scopes
     );
@@ -155,24 +155,18 @@ pub struct YouTubeSubscribeForm {
     pub topic_url: String,
     pub hmac_secret: String,
     pub post_shorts: bool,
-    pub callback_url: String,
 }
 
 impl YouTubeSubscribeForm {
     fn validate(subscription: &Self) -> Result<(YouTubeSubscription, String), ApiError> {
         let topic_url = subscription.topic_url.trim();
         let hmac_secret = subscription.hmac_secret.trim();
-        let callback_url = subscription.callback_url.trim().trim_matches('/').trim();
         let channel_id = extract_channel_id_from_topic_url(&subscription.topic_url)?;
 
-        if topic_url.is_empty()
-            || hmac_secret.is_empty()
-            || callback_url.is_empty()
-            || channel_id.is_empty()
-        {
+        if topic_url.is_empty() || hmac_secret.is_empty() || channel_id.is_empty() {
             return Err(ApiError::BadRequest(format!(
-                "Topic URL, HMAC secret, callback url or channel id input was empty. Inputted Topic URL: '{}' HMAC secret: '{}' callback url: '{}' channel id '{}'",
-                topic_url, hmac_secret, callback_url, channel_id
+                "Topic URL, HMAC secret, callback url or channel id input was empty. Inputted Topic URL: '{}' HMAC secret: '{}' channel id '{}'",
+                topic_url, hmac_secret, channel_id
             )));
         }
 
@@ -185,11 +179,6 @@ impl YouTubeSubscribeForm {
                 channel_id: channel_id.to_string(),
                 hmac_secret: hmac_secret.to_string(),
                 post_shorts: subscription.post_shorts,
-                callback_url: format!(
-                    "{origin}/google/subscription/{id}",
-                    origin = callback_url,
-                    id = uuid_str
-                ),
             },
             uuid_str,
         ))
@@ -225,14 +214,11 @@ async fn youtube_channel_subscribe(
     save_form_data(&state.db_pool, &uuid_str, &subscription_json_str).await?;
 
     subscribe_to_channel(
-        &subscription.callback_url,
+        &format!("{}/google/subscription/{}", &state.base_url, uuid_str),
         &subscription.channel_id,
         &subscription.hmac_secret,
     )
     .await?;
 
-    // The callback_url value in form_input is the window.location.href inserted value
-    Ok(Redirect::to(
-        form_input.callback_url.trim().trim_matches('/').trim(),
-    ))
+    Ok(Redirect::to(&state.base_url))
 }

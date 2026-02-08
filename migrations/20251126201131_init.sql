@@ -24,7 +24,6 @@ CREATE TABLE subscriptions (
     channel_id TEXT NOT NULL,
     channel_name TEXT NOT NULL,
     hmac_secret TEXT NOT NULL,
-    callback_url TEXT NOT NULL,
     expires INTEGER,
     post_shorts INTEGER NOT NULL
 );

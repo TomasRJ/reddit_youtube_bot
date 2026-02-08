@@ -15,6 +15,7 @@ pub struct AppState {
     pub hb: Handlebars<'static>,
     pub scheduler_sender: mpsc::Sender<SubCommand>,
     pub reddit_credentials: RedditCredentials,
+    pub base_url: String,
 }
 
 impl AppState {
@@ -30,6 +31,7 @@ impl AppState {
         let (scheduler_sender, scheduler_receiver) = mpsc::channel(100);
 
         let reddit_credentials = settings.reddit_credentials;
+        let base_url = settings.base_url;
 
         (
             Arc::new(Self {
@@ -37,6 +39,7 @@ impl AppState {
                 hb,
                 scheduler_sender,
                 reddit_credentials,
+                base_url,
             }),
             scheduler_receiver,
         )
