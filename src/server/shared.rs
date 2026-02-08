@@ -115,8 +115,8 @@ pub struct Subreddit {
 #[derive(Serialize, Deserialize)]
 pub struct RedditSubmissionData {
     pub url: String,
+    #[serde(rename = "name")]
     pub id: String,
-    pub name: String,
 }
 
 // Enums

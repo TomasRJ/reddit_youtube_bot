@@ -43,7 +43,7 @@ CREATE TABLE reddit_accounts (
     username TEXT NOT NULL,
     client_id TEXT NOT NULL,
     user_secret TEXT NOT NULL,
-    moderate_submissions INTEGER NOT NULL,
+    moderate_submissions INTEGER NOT NULL DEFAULT 0,
     oauth_token TEXT NOT NULL,
     expires_at INTEGER NOT NULL
 );
@@ -59,7 +59,7 @@ CREATE TABLE subscription_reddit_accounts (
 
 CREATE TABLE subreddits (
     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
+    name TEXT NOT NULL UNIQUE,
     title_prefix TEXT,
     title_suffix TEXT,
     flair_id TEXT
@@ -91,7 +91,6 @@ CREATE TABLE subscription_submissions (
     PRIMARY KEY (subscription_id, submission_id),
     FOREIGN KEY (submission_id) REFERENCES submissions(id) ON DELETE CASCADE
 );
-
 
 CREATE TABLE forms (
     id TEXT NOT NULL PRIMARY KEY,

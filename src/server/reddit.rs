@@ -1,6 +1,9 @@
 use std::{collections::HashMap, sync::Arc};
 
-use axum::extract::{Query, State};
+use axum::{
+    extract::{Query, State},
+    response::Redirect,
+};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_textual::DisplaySerde;
@@ -15,7 +18,8 @@ use crate::{
         ApiError,
         repository::{
             fetch_form_data, fetch_reddit_accounts_for_subscription,
-            fetch_submissions_on_subreddit, save_reddit_account, update_reddit_oauth_token,
+            fetch_submissions_on_subreddit, get_or_create_subreddit, save_reddit_account,
+            save_reddit_submission, update_reddit_oauth_token,
             update_reddit_submission_sticky_state,
         },
         shared::{
@@ -107,8 +111,9 @@ pub enum RedditCallbackErrors {
 async fn reddit_callback(
     State(state): State<Arc<AppState>>,
     Query(callback): Query<RedditCallback>,
-) -> Result<(), ApiError> {
+) -> Result<Redirect, ApiError> {
     let state_uuid = RedditCallback::validate(&callback.state, &callback.error)?;
+    println!("Now handling a Reddit OAuth callback");
 
     let reddit_auth_form_data: RedditAuthorization =
         fetch_form_data(&state.db_pool, &state_uuid.to_string()).await?;
@@ -138,11 +143,15 @@ async fn reddit_callback(
         ))
     })?;
 
+    println!("Successfully created Reddit OAuth token, now verifying its scopes.");
+
     if !oauth_token.scope.contains("identity") {
         return Err(ApiError::BadRequest(
             "'identity' Reddit API scope needed for to get username".into(),
         ));
     }
+
+    println!("Fetching Reddit username using the OAuth token.");
 
     // uses serde_json::Value since the 'name' property is the only value wanted
     let reddit_user_name = client
@@ -160,15 +169,174 @@ async fn reddit_callback(
             )
         })?;
 
-    save_reddit_account(
+    let reddit_account_id = save_reddit_account(
         &state.db_pool,
         &reddit_user_name,
         &oauth_token,
-        reddit_auth_form_data,
+        &reddit_auth_form_data,
     )
     .await?;
 
+    println!("Reddit account data saved to db, now handling previous Reddit submissions.");
+
+    handle_previous_reddit_submissions(&state.db_pool, &reddit_account_id, &reddit_user_name)
+        .await?;
+
+    let home_url = match reddit_auth_form_data
+        .redirect_url
+        .split_once("reddit/callback")
+    {
+        Some((url, _)) => Some(url),
+        None => None,
+    };
+
+    Ok(Redirect::to(home_url.unwrap_or("/")))
+}
+
+async fn handle_previous_reddit_submissions(
+    pool: &Pool<Sqlite>,
+    reddit_account_id: &i64,
+    reddit_user_name: &String,
+) -> Result<(), ApiError> {
+    let reddit_account_submissions = fetch_reddit_account_submissions(format!(
+        "https://www.reddit.com/user/{}/submitted.json",
+        reddit_user_name
+    ))
+    .await?;
+
+    let mut submission_data = reddit_account_submissions.data;
+
+    println!("Fetched {} Reddit submissions.", submission_data.len());
+
+    let mut next_page_token = reddit_account_submissions.next_page_token;
+
+    while let Some(token) = next_page_token {
+        let new_submission_data = fetch_reddit_account_submissions(format!(
+            "https://www.reddit.com/user/{}/submitted.json?after={}",
+            reddit_user_name, token
+        ))
+        .await?;
+
+        next_page_token = new_submission_data.next_page_token;
+        submission_data.extend(new_submission_data.data);
+        println!("Fetched {} Reddit submissions.", submission_data.len());
+    }
+
+    let filtered_submissions: Vec<SubmissionJsonData> = submission_data
+        .into_iter()
+        .filter(|submission| {
+            let url = &submission.url;
+
+            url.contains("youtube.com") || url.contains("youtu.be")
+        })
+        .collect();
+
+    println!(
+        "Filtered down to {} YouTube video link submissions for https://www.reddit.com/user/{}",
+        filtered_submissions.len(),
+        reddit_user_name
+    );
+
+    for submission in filtered_submissions {
+        let subreddit =
+            get_or_create_subreddit(&pool, &submission.subreddit_name, &submission.flair_id)
+                .await?;
+        let timestamp = submission.created_utc.round() as i64;
+        let video_id = youtube_url_to_video_id(&submission.url);
+
+        let video_id = if let Some(video_id) = video_id {
+            video_id
+        } else {
+            println!(
+                "Could not extract the YouTube video id from following URL: {}",
+                &submission.url
+            );
+            continue;
+        };
+
+        save_reddit_submission(
+            &pool,
+            &submission.id,
+            &video_id,
+            &reddit_account_id,
+            &subreddit.id,
+            &timestamp,
+            &submission.stickied,
+        )
+        .await?;
+    }
+
+    println!("Previous submissions now saved to DB.");
+
     Ok(())
+}
+
+fn youtube_url_to_video_id(url: &String) -> Option<String> {
+    if let Some(("https://www.youtube.com/watch?v", video_id)) = url.split_once('=') {
+        return Some(video_id.to_string());
+    }
+
+    if let Some(("https://www.youtube.com/", video_id)) = url.split_once("shorts/") {
+        return Some(video_id.to_string());
+    }
+
+    if let Some(("https://youtu.", video_id)) = url.split_once("be/") {
+        // remove potential tracking id from url
+        if video_id.contains("?") {
+            match video_id.split_once('?') {
+                Some((video_id, _)) => return Some(video_id.to_string()),
+                None => return Some(video_id.to_string()),
+            }
+        }
+        return Some(video_id.to_string());
+    }
+
+    return None;
+}
+
+#[derive(Deserialize)]
+pub struct RedditSubmissionJson {
+    pub next_page_token: Option<String>,
+    pub data: Vec<SubmissionJsonData>,
+}
+
+#[derive(Deserialize)]
+pub struct SubmissionJsonData {
+    #[serde(rename = "name")]
+    pub id: String,
+    pub url: String,
+    #[serde(rename = "subreddit")]
+    pub subreddit_name: String,
+    #[serde(rename = "link_flair_template_id")]
+    pub flair_id: Option<String>,
+    pub created_utc: f64,
+    pub stickied: bool,
+}
+
+async fn fetch_reddit_account_submissions(url: String) -> Result<RedditSubmissionJson, ApiError> {
+    let client = &HTTP_CLIENT;
+
+    let reddit_submissions = client
+        .get(url)
+        .send()
+        .await?
+        .json::<serde_json::Value>()
+        .await?;
+
+    let next_page_token: Option<String> =
+        serde_json::from_value(reddit_submissions["data"]["after"].clone())?;
+
+    let submission_data: Vec<SubmissionJsonData> = reddit_submissions["data"]["children"]
+        .as_array()
+        .into_iter() // Creates an iterator over the Option
+        .flatten() // Flattens Option<Vec> into the elements of the Vec
+        .filter_map(|child| serde_json::from_value(child["data"].clone()).ok())
+        .collect();
+
+    Ok(RedditSubmissionJson {
+        next_page_token,
+        data: submission_data,
+    })
 }
 
 pub async fn get_associated_reddit_accounts_for_subscription(

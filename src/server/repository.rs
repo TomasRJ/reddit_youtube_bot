@@ -108,8 +108,8 @@ pub async fn save_reddit_account(
     pool: &Pool<Sqlite>,
     username: &String,
     oauth_token: &RedditOAuthToken,
-    reddit_auth_form_data: RedditAuthorization,
-) -> Result<(), ApiError> {
+    reddit_auth_form_data: &RedditAuthorization,
+) -> Result<i64, ApiError> {
     let expires_at = Utc::now().timestamp() + &oauth_token.expires_in;
     let oauth_token_json_str = serde_json::to_string(&oauth_token)?;
 
@@ -134,7 +134,7 @@ pub async fn save_reddit_account(
         )));
     }
 
-    Ok(())
+    Ok(save_reddit_oauth_token_result.last_insert_rowid())
 }
 
 pub async fn handle_youtube_subscription(
@@ -385,19 +385,21 @@ pub async fn video_already_submitted_to_subreddit(
 
 pub async fn save_reddit_submission(
     pool: &Pool<Sqlite>,
-    reddit_submission_name: &String,
+    submission_id: &String,
     video_id: &String,
     reddit_account_id: &i64,
     subreddit_id: &i64,
     timestamp: &i64,
+    stickied: &bool,
 ) -> Result<(), ApiError> {
     let save_reddit_submission_result = query!(
         r#"
-        INSERT INTO submissions(id, video_id, subreddit_id, reddit_account_id, created_at)
-        VALUES (?, ?, ?, ?, ?);
+        INSERT INTO submissions(id, video_id, stickied, subreddit_id, reddit_account_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?);
         "#,
-        reddit_submission_name,
+        submission_id,
         video_id,
+        stickied,
         subreddit_id,
         reddit_account_id,
         timestamp,
@@ -418,7 +420,7 @@ pub async fn save_reddit_submission(
 pub async fn save_subscription_submission(
     pool: &Pool<Sqlite>,
     subscription_id: &String,
-    reddit_submission_name: &String,
+    reddit_submission_id: &String,
 ) -> Result<(), ApiError> {
     let save_subscription_submission_result = query!(
         r#"
@@ -426,7 +428,7 @@ pub async fn save_subscription_submission(
         VALUES (?, ?);
         "#,
         subscription_id,
-        reddit_submission_name,
+        reddit_submission_id,
     )
     .execute(&*pool)
     .await?;
@@ -542,4 +544,74 @@ pub async fn update_reddit_submission_sticky_state(
     }
 
     Ok(())
+}
+
+pub async fn get_or_create_subreddit(
+    pool: &Pool<Sqlite>,
+    subreddit_name: &String,
+    flair_id: &Option<String>,
+) -> Result<Subreddit, ApiError> {
+    let subreddit = query_as!(
+        Subreddit,
+        r#"
+        SELECT
+            s.id,
+            s.name,
+            s.title_prefix,
+            s.title_suffix,
+            s.flair_id
+        FROM
+            subreddits s
+        WHERE
+            s.name = ?;
+        "#,
+        subreddit_name
+    )
+    .fetch_optional(&*pool)
+    .await?;
+
+    if let Some(sub) = subreddit {
+        return Ok(sub);
+    }
+
+    let create_subreddit_result = query!(
+        r#"
+        INSERT INTO subreddits(name, flair_id)
+        VALUES (?, ?);
+        "#,
+        subreddit_name,
+        flair_id,
+    )
+    .execute(&*pool)
+    .await?;
+
+    if create_subreddit_result.rows_affected() != 1 {
+        return Err(ApiError::InternalError(format!(
+            "get_or_create_subreddit rows_affected error: {:?}",
+            create_subreddit_result
+        )));
+    }
+
+    let subreddit_id = create_subreddit_result.last_insert_rowid();
+
+    let subreddit = query_as!(
+        Subreddit,
+        r#"
+        SELECT
+            s.id,
+            s.name,
+            s.title_prefix,
+            s.title_suffix,
+            s.flair_id
+        FROM
+            subreddits s
+        WHERE
+            s.id = ?;
+        "#,
+        subreddit_id
+    )
+    .fetch_one(&*pool)
+    .await?;
+
+    Ok(subreddit)
 }

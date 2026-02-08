@@ -221,15 +221,16 @@ async fn new_video_published(
 
             save_reddit_submission(
                 &state.db_pool,
-                &reddit_submission.name,
+                &reddit_submission.id,
                 &feed.entry.yt_video_id,
                 &reddit_account_id,
                 &subreddit.id,
                 &Utc::now().timestamp(),
+                &false,
             )
             .await?;
 
-            save_subscription_submission(&state.db_pool, &subscription_id, &reddit_submission.name)
+            save_subscription_submission(&state.db_pool, &subscription_id, &reddit_submission.id)
                 .await?;
 
             if reddit_account.moderate_submissions {
