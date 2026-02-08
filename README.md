@@ -30,4 +30,5 @@ It current has 2 HTML forms:
 
 5. Run `cargo run start`
    1. You can use a custom port with: `cargo run start --port PORT`
+   2. This project uses [bacon](https://dystroy.org/bacon/#installation) to make changes i development hot-reloadable. To use it in this project run it with `bacon webserver` in the project dir.
 6. Go to <http://localhost:PORT> to view the frontend or to <http://localhost:PORT/rapidoc> to view the project's OpenAPI documentation (via [rapidoc](https://rapidocweb.com/))
