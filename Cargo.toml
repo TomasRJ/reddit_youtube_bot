@@ -26,6 +26,7 @@ thiserror = "2.0.17"
 tokio = { version = "1.48.0", features = ["rt-multi-thread"] }
 tokio-stream = "0.1.18"
 tokio-util = { version = "0.7.18", features = ["time"] }
+url = { version = "2.5.8", features = ["serde"] }
 utoipa = { version = "5.4.0", features = ["chrono"] }
 utoipa-axum = "0.2.0"
 utoipa-rapidoc = { version = "6.0.0", features = ["axum"] }

@@ -1664,6 +1664,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util",
+ "url",
  "utoipa",
  "utoipa-axum",
  "utoipa-rapidoc",
@@ -2596,6 +2597,7 @@ dependencies = [
  "idna",
  "percent-encoding",
  "serde",
+ "serde_derive",
 ]
 
 [[package]]

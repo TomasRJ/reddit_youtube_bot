@@ -8,6 +8,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_textual::DisplaySerde;
 use sqlx::{Pool, Sqlite};
+use url::Url;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 use uuid::Uuid;
@@ -217,13 +218,9 @@ async fn handle_previous_reddit_submissions(
         println!("Fetched {} Reddit submissions.", submission_data.len());
     }
 
-    let filtered_submissions: Vec<SubmissionJsonData> = submission_data
+    let filtered_submissions: Vec<SubmissionData> = submission_data
         .into_iter()
-        .filter(|submission| {
-            let url = &submission.url;
-
-            url.contains("youtube.com") || url.contains("youtu.be")
-        })
+        .filter_map(|data| to_submission_data(&data))
         .collect();
 
     println!(
@@ -239,26 +236,14 @@ async fn handle_previous_reddit_submissions(
             &submission.flair_id,
         )
         .await?;
-        let timestamp = submission.created_utc.round() as i64;
-        let video_id = youtube_url_to_video_id(&submission.url);
-
-        let video_id = if let Some(video_id) = video_id {
-            video_id
-        } else {
-            println!(
-                "Could not extract the YouTube video id from following URL: {}",
-                &submission.url
-            );
-            continue;
-        };
 
         save_reddit_submission(
             &state.db_pool,
             &submission.id,
-            &video_id,
+            &submission.video_id,
             &reddit_account_id,
             &subreddit.id,
-            &timestamp,
+            &submission.timestamp,
             &submission.stickied,
         )
         .await?;
@@ -269,27 +254,51 @@ async fn handle_previous_reddit_submissions(
     Ok(())
 }
 
-fn youtube_url_to_video_id(url: &String) -> Option<String> {
-    if let Some(("https://www.youtube.com/watch?v", video_id)) = url.split_once('=') {
-        return Some(video_id.to_string());
+struct SubmissionData {
+    pub id: String,
+    pub video_id: String,
+    pub subreddit_name: String,
+    pub timestamp: i64,
+    pub stickied: bool,
+    pub flair_id: Option<String>,
+}
+
+fn to_submission_data(data: &SubmissionJsonData) -> Option<SubmissionData> {
+    let video_id = youtube_url_to_video_id(&data.url)?;
+    let timestamp = data.created_utc.round() as i64;
+
+    return Some(SubmissionData {
+        id: data.id.clone(),
+        video_id,
+        subreddit_name: data.subreddit_name.clone(),
+        timestamp,
+        stickied: data.stickied,
+        flair_id: data.flair_id.clone(),
+    });
+}
+
+fn youtube_url_to_video_id(url: &Url) -> Option<String> {
+    let domain = url.domain()?;
+
+    // Handle https://youtu.be/ID
+    if domain.ends_with("youtu.be") {
+        return url.path_segments()?.next().map(|id| id.to_string());
     }
 
-    if let Some(("https://www.youtube.com/", video_id)) = url.split_once("shorts/") {
-        return Some(video_id.to_string());
-    }
-
-    if let Some(("https://youtu.", video_id)) = url.split_once("be/") {
-        // remove potential tracking id from url
-        if video_id.contains("?") {
-            match video_id.split_once('?') {
-                Some((video_id, _)) => return Some(video_id.to_string()),
-                None => return Some(video_id.to_string()),
-            }
+    if domain.ends_with("youtube.com") {
+        // Handle https://youtube.com/shorts/ID
+        if url.path_segments()?.next() == Some("shorts") {
+            return url.path_segments()?.next().map(|id| id.to_string());
         }
-        return Some(video_id.to_string());
+
+        // Handle https://youtube.com/watch?v=ID
+        return url
+            .query_pairs()
+            .find(|(key, _)| key == "v")
+            .map(|(_, id)| id.to_string());
     }
 
-    return None;
+    None
 }
 
 #[derive(Deserialize)]
@@ -302,7 +311,7 @@ pub struct RedditSubmissionJson {
 pub struct SubmissionJsonData {
     #[serde(rename = "name")]
     pub id: String,
-    pub url: String,
+    pub url: Url,
     #[serde(rename = "subreddit")]
     pub subreddit_name: String,
     #[serde(rename = "link_flair_template_id")]
