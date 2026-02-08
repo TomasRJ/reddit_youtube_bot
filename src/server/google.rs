@@ -194,7 +194,7 @@ async fn new_video_published(
         for subreddit in reddit_account_subreddits {
             if video_already_submitted_to_subreddit(
                 &state.db_pool,
-                &reddit_account_id,
+                &subreddit.id,
                 &feed.entry.yt_video_id,
             )
             .await?
