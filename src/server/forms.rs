@@ -63,6 +63,7 @@ static REDDIT_SCOPES: LazyLock<HashSet<&str>> = LazyLock::new(|| {
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct RedditAuthorizeForm {
+    pub moderate_submissions: bool,
     pub duration: RedditAuthorizeDuration,
     pub scopes: String,
 }
@@ -103,6 +104,7 @@ impl RedditAuthorizeForm {
 
         Ok(RedditAuthorization {
             r#type: FormType::Reddit,
+            moderate_submissions: authorize_form_data.moderate_submissions,
             duration: authorize_form_data.duration.clone(),
             scopes: scopes.to_string(),
         })

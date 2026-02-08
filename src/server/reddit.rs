@@ -173,8 +173,13 @@ async fn reddit_callback(
             )
         })?;
 
-    let reddit_account_id =
-        save_reddit_account(&state.db_pool, &reddit_user_name, &oauth_token).await?;
+    let reddit_account_id = save_reddit_account(
+        &state.db_pool,
+        &reddit_user_name,
+        &oauth_token,
+        &reddit_auth_form_data.moderate_submissions,
+    )
+    .await?;
 
     println!("Reddit account data saved to db, now handling previous Reddit submissions.");
 

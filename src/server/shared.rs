@@ -18,6 +18,7 @@ pub struct RedditCredentials {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RedditAuthorization {
     pub r#type: FormType,
+    pub moderate_submissions: bool,
     pub duration: RedditAuthorizeDuration,
     pub scopes: String,
 }

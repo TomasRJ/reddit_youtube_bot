@@ -108,16 +108,18 @@ pub async fn save_reddit_account(
     pool: &Pool<Sqlite>,
     username: &String,
     oauth_token: &RedditOAuthToken,
+    moderate_submissions: &bool,
 ) -> Result<i64, ApiError> {
     let expires_at = Utc::now().timestamp() + &oauth_token.expires_in;
     let oauth_token_json_str = serde_json::to_string(&oauth_token)?;
 
     let save_reddit_oauth_token_result = query!(
         r#"
-        INSERT INTO reddit_accounts(username, oauth_token, expires_at)
-        VALUES (?, ?, ?);
+        INSERT INTO reddit_accounts(username, moderate_submissions, oauth_token, expires_at)
+        VALUES (?, ?, ?, ?);
         "#,
         username,
+        moderate_submissions,
         oauth_token_json_str,
         expires_at,
     )

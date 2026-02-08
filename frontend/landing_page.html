@@ -10,10 +10,16 @@
         <article class="mt-5 mx-0 p-4 col-lg-5 col-md-8 container-sm border border-black rounded">
             <h4>Authorize to post on Reddit</h4>
             <form method="post" action="forms/reddit">
+                <label for="authorize_moderate_submissions" class="form-label">Should Reddit account moderate
+                    submissions?</label>
+                <select id="authorize_moderate_submissions" class="form-select" name="moderate_submissions" required>
+                    <option selected value="false">No</option>
+                    <option value="true">Yes</option>
+                </select>
                 <label for="authorize_duration" class="form-label">Duration of the authorization</label>
                 <select id="authorize_duration" class="form-select" name="duration" required>
-                    <option selected value="permanent">permanent</option>
-                    <option value="temporary">temporary</option>
+                    <option selected value="permanent">Permanent</option>
+                    <option value="temporary">Temporary</option>
                 </select>
                 <label for="authorize_scope" class="form-label">Scope (only valid values are: identity, edit, flair,
                     history,

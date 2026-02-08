@@ -40,7 +40,7 @@ CREATE TABLE user_subscriptions (
 CREATE TABLE reddit_accounts (
     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL,    
-    moderate_submissions INTEGER NOT NULL DEFAULT 0,
+    moderate_submissions INTEGER NOT NULL,
     oauth_token TEXT NOT NULL,
     expires_at INTEGER NOT NULL
 );
