@@ -1,5 +1,6 @@
 use chrono::Utc;
 use sqlx::{Pool, Sqlite, query, query_as, query_scalar};
+use uuid::Uuid;
 
 use crate::server::{
     ApiError,
@@ -109,15 +110,17 @@ pub async fn save_reddit_account(
     username: &String,
     oauth_token: &RedditOAuthToken,
     moderate_submissions: &bool,
-) -> Result<i64, ApiError> {
+) -> Result<String, ApiError> {
     let expires_at = Utc::now().timestamp() + &oauth_token.expires_in;
     let oauth_token_json_str = serde_json::to_string(&oauth_token)?;
+    let uuid_str = Uuid::now_v7().to_string();
 
     let save_reddit_oauth_token_result = query!(
         r#"
-        INSERT INTO reddit_accounts(username, moderate_submissions, oauth_token, expires_at)
-        VALUES (?, ?, ?, ?);
+        INSERT INTO reddit_accounts(id, username, moderate_submissions, oauth_token, expires_at)
+        VALUES (?, ?, ?, ?, ?);
         "#,
+        uuid_str,
         username,
         moderate_submissions,
         oauth_token_json_str,
@@ -133,7 +136,7 @@ pub async fn save_reddit_account(
         )));
     }
 
-    Ok(save_reddit_oauth_token_result.last_insert_rowid())
+    Ok(uuid_str)
 }
 
 pub async fn handle_youtube_subscription(
@@ -270,7 +273,7 @@ pub async fn fetch_reddit_accounts_for_subscription(
 
 pub async fn update_reddit_oauth_token(
     pool: &Pool<Sqlite>,
-    reddit_account_id: &i64,
+    reddit_account_id: &String,
     oauth_token: &RedditOAuthToken,
 ) -> Result<(), ApiError> {
     let expires_at = Utc::now().timestamp() + oauth_token.expires_in;
@@ -305,7 +308,7 @@ pub async fn update_reddit_oauth_token(
 
 pub async fn fetch_subreddits_for_reddit_account(
     pool: &Pool<Sqlite>,
-    reddit_account_id: &i64,
+    reddit_account_id: &String,
 ) -> Result<Vec<Subreddit>, ApiError> {
     let reddit_account_has_subreddit = query_scalar!(
         r#"
@@ -383,7 +386,7 @@ pub async fn save_reddit_submission(
     pool: &Pool<Sqlite>,
     submission_id: &String,
     video_id: &String,
-    reddit_account_id: &i64,
+    reddit_account_id: &String,
     subreddit_id: &i64,
     timestamp: &i64,
     stickied: &bool,

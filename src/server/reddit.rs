@@ -190,7 +190,7 @@ async fn reddit_callback(
 
 async fn handle_previous_reddit_submissions(
     state: &Arc<AppState>,
-    reddit_account_id: &i64,
+    reddit_account_id: &String,
     reddit_user_name: &String,
 ) -> Result<(), ApiError> {
     let reddit_account_submissions = fetch_reddit_account_submissions(

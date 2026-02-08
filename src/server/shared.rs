@@ -91,7 +91,7 @@ pub struct Author {
     pub uri: String,
 }
 pub struct RedditAccountDTO {
-    pub id: i64,
+    pub id: String,
     pub username: String,
     pub moderate_submissions: bool,
     pub oauth_token: String,
@@ -99,7 +99,7 @@ pub struct RedditAccountDTO {
 }
 
 pub struct RedditAccount {
-    pub id: i64,
+    pub id: String,
     pub username: String,
     pub oauth_token: RedditOAuthToken,
     pub moderate_submissions: bool,

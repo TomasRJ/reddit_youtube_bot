@@ -172,10 +172,8 @@ async fn new_video_published(
     );
 
     for reddit_account in subscription_reddit_accounts {
-        let reddit_account_id = reddit_account.id;
-
         let reddit_account_subreddits =
-            fetch_subreddits_for_reddit_account(&state.db_pool, &reddit_account_id).await?;
+            fetch_subreddits_for_reddit_account(&state.db_pool, &reddit_account.id).await?;
 
         if reddit_account_subreddits.is_empty() {
             println!(
@@ -223,7 +221,7 @@ async fn new_video_published(
                 &state.db_pool,
                 &reddit_submission.id,
                 &feed.entry.yt_video_id,
-                &reddit_account_id,
+                &reddit_account.id,
                 &subreddit.id,
                 &Utc::now().timestamp(),
                 &false,
