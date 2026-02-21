@@ -19,8 +19,8 @@ use crate::{
         },
         repository::{
             fetch_form_data, fetch_subreddits_for_reddit_account, get_subscription_details,
-            handle_youtube_subscription, save_reddit_submission, save_subscription_submission,
-            update_youtube_subscription, video_already_submitted_to_subreddit,
+            handle_youtube_subscription, save_reddit_submission, update_youtube_subscription,
+            video_already_submitted_to_subreddit,
         },
         shared::{
             Author, Feed, HTTP_CLIENT, Verification, VerificationMode, YouTubeSubscription,
@@ -225,11 +225,9 @@ async fn new_video_published(
                 &subreddit.id,
                 &Utc::now().timestamp(),
                 &false,
+                Some(&subscription_id),
             )
             .await?;
-
-            save_subscription_submission(&state.db_pool, &subscription_id, &reddit_submission.id)
-                .await?;
 
             if reddit_account.moderate_submissions {
                 moderate_submission(&state, &reddit_account, &subreddit).await?;

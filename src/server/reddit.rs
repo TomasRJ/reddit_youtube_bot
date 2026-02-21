@@ -250,6 +250,7 @@ async fn handle_previous_reddit_submissions(
             &subreddit.id,
             &submission.timestamp,
             &submission.stickied,
+            None,
         )
         .await?;
     }
@@ -448,7 +449,7 @@ pub async fn submit_video_to_subreddit(
 
     let submission_response = client
         .post("https://oauth.reddit.com/api/submit")
-        .bearer_auth(reddit_account.oauth_token.access_token.clone())
+        .bearer_auth(&reddit_account.oauth_token.access_token)
         .form(&submission_form)
         .send()
         .await?

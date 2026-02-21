@@ -390,16 +390,18 @@ pub async fn save_reddit_submission(
     subreddit_id: &i64,
     timestamp: &i64,
     stickied: &bool,
+    subscription_id: Option<&String>,
 ) -> Result<(), ApiError> {
     let save_reddit_submission_result = query!(
         r#"
-        INSERT INTO submissions(id, video_id, stickied, subreddit_id, reddit_account_id, created_at)
-        VALUES (?, ?, ?, ?, ?, ?);
+        INSERT INTO submissions(id, video_id, stickied, subreddit_id, subscription_id, reddit_account_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?);
         "#,
         submission_id,
         video_id,
         stickied,
         subreddit_id,
+        subscription_id,
         reddit_account_id,
         timestamp,
     )
@@ -410,32 +412,6 @@ pub async fn save_reddit_submission(
         return Err(ApiError::InternalError(format!(
             "save_reddit_submission rows_affected error: {:?}",
             save_reddit_submission_result
-        )));
-    }
-
-    Ok(())
-}
-
-pub async fn save_subscription_submission(
-    pool: &Pool<Sqlite>,
-    subscription_id: &String,
-    reddit_submission_id: &String,
-) -> Result<(), ApiError> {
-    let save_subscription_submission_result = query!(
-        r#"
-        INSERT INTO subscription_submissions(subscription_id, submission_id)
-        VALUES (?, ?);
-        "#,
-        subscription_id,
-        reddit_submission_id,
-    )
-    .execute(&*pool)
-    .await?;
-
-    if save_subscription_submission_result.rows_affected() != 1 {
-        return Err(ApiError::InternalError(format!(
-            "save_subscription_submission rows_affected error: {:?}",
-            save_subscription_submission_result
         )));
     }
 

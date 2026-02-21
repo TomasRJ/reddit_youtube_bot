@@ -77,16 +77,10 @@ CREATE TABLE submissions (
     stickied INTEGER NOT NULL DEFAULT 0,
     reddit_account_id INTEGER NOT NULL,
     subreddit_id INTEGER NOT NULL,
+    subscription_id TEXT,
     created_at INTEGER NOT NULL,
     FOREIGN KEY (reddit_account_id) REFERENCES reddit_accounts(id) ON DELETE CASCADE,
     FOREIGN KEY (subreddit_id) REFERENCES subreddits(id) ON DELETE CASCADE
-);
-
-CREATE TABLE subscription_submissions (
-    subscription_id TEXT NOT NULL,
-    submission_id TEXT NOT NULL,
-    PRIMARY KEY (subscription_id, submission_id),
-    FOREIGN KEY (submission_id) REFERENCES submissions(id) ON DELETE CASCADE
 );
 
 CREATE TABLE forms (
