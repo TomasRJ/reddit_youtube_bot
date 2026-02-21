@@ -10,7 +10,7 @@
         <tbody>
             {{#each subscriptions}}
             <tr>
-                <td><a href="https://www.youtube.com/channel/{{this.channel_id}}">{{this.channel_name}}</a></td>
+                <td><a href="subscription/{{this.id}}">{{this.channel_name}}</a></td>
                 <td>{{this.expires_at}}</td>
             </tr>
             {{else}}

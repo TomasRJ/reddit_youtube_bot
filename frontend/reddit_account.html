@@ -1,0 +1,79 @@
+<div class="container mt-5">
+    <div class="card shadow-sm mx-auto" style="max-width: 600px;">
+        <header class="card-header bg-white py-3">
+            <h2 class="h5 mb-0 text-primary">Reddit account</h2>
+        </header>
+
+        <article class="card-body">
+            <h5 class="text-center">
+                <a href="https://reddit.com/user/{{ account.username }}" target="_blank">{{
+                    account.username
+                    }}</a>
+            </h5>
+            <form action="/update-account" method="POST">
+                <input type="hidden" name="id" value="{{ account.id }}">
+
+                <div class="mb-3">
+                    <label for="oauth_token" class="form-label fw-bold">OAuth Token</label>
+                    <textarea type="password" class="form-control" id="oauth_token" disabled style="height: 450px;">
+                        {{ account.oauth_token }}
+                    </textarea>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="expires_at" class="form-label fw-bold">Expires At</label>
+                        <input type="text" class="form-control" id="expires_at" name="expires_at"
+                            value="{{ account.expires_at }}" disabled>
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="moderate_submissions"
+                                name="moderate_submissions" value="1" {{ #if account.moderate_submissions }}checked{{
+                                /if }}>
+                            <label class="form-check-label" for="moderate_submissions">
+                                Moderate Submissions
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <div class="d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal"
+                        data-bs-target="#deleteModal">
+                        Delete Account
+                    </button>
+
+                    <div>
+                        <a href="/" class="btn btn-link text-decoration-none">Cancel</a>
+                        <button type="submit" class="btn btn-primary px-4">Save Changes</button>
+                    </div>
+                </div>
+            </form>
+        </article>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete the account <strong>{{ account.username }}</strong>? This action cannot
+                be undone.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Keep Account</button>
+                <form action="delete-account" method="POST" class="d-inline">
+                    <input type="hidden" name="id" value="{{ account.id }}">
+                    <button type="submit" class="btn btn-danger">Yes, Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

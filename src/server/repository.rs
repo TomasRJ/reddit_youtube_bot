@@ -612,3 +612,56 @@ pub async fn get_or_create_subreddit(
 
     Ok(subreddit)
 }
+
+pub async fn get_reddit_account_by_id(
+    pool: &Pool<Sqlite>,
+    reddit_account_id: &String,
+) -> Result<RedditAccountDTO, ApiError> {
+    let reddit_accounts = query_as!(
+        RedditAccountDTO,
+        r#"
+        SELECT
+            ra.id,
+            ra.username,
+            ra.moderate_submissions as "moderate_submissions: bool",
+            ra.oauth_token,
+            ra.expires_at
+        FROM
+            reddit_accounts ra
+        WHERE
+            ra.id = ?;
+        "#,
+        reddit_account_id
+    )
+    .fetch_one(&*pool)
+    .await?;
+
+    Ok(reddit_accounts)
+}
+
+pub async fn get_subscription_by_id(
+    pool: &Pool<Sqlite>,
+    subscription_account_id: &String,
+) -> Result<Subscription, ApiError> {
+    let subscription = query_as!(
+        Subscription,
+        r#"
+        SELECT
+            s.id,
+            s.channel_id,
+            s.channel_name,
+            s.hmac_secret,
+            s.expires,
+            s.post_shorts as "post_shorts: bool"
+        FROM
+            subscriptions s
+        WHERE
+            s.id = ?;
+        "#,
+        subscription_account_id
+    )
+    .fetch_one(&*pool)
+    .await?;
+
+    Ok(subscription)
+}

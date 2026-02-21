@@ -1,0 +1,77 @@
+<div class="container mt-5">
+    <div class="card shadow-sm mx-auto" style="max-width: 600px;">
+        <header class="card-header bg-white py-3">
+            <h2 class="h5 mb-0 text-primary">Subscription</h2>
+        </header>
+
+        <article class="card-body">
+            <h5 class="text-center">
+                <a href="https://youtube.com/channel/{{ subscription.channel_id }}" target="_blank">{{
+                    subscription.channel_name
+                    }}</a>
+            </h5>
+            <form action="/update-subscription" method="POST">
+                <input type="hidden" name="id" value="{{ subscription.id }}">
+
+                <div class="mb-3">
+                    <label for="hmac_secret" class="form-label fw-bold">HMAC secret</label>
+                    <input type="text" class="form-control" id="hmac_secret" value="{{ subscription.hmac_secret }}">
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="expires_at" class="form-label fw-bold">Expires At</label>
+                        <input type="text" class="form-control" id="expires_at" name="expires_at"
+                            value="{{ subscription.expires_at }}" disabled>
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="post_shorts" name="post_shorts"
+                                value="1" {{ #if subscription.post_shorts }}checked{{ /if }}>
+                            <label class="form-check-label" for="post_shorts">
+                                Submit YouTube shorts?
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <div class="d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal"
+                        data-bs-target="#deleteModal">
+                        Delete subscription
+                    </button>
+
+                    <div>
+                        <a href="/" class="btn btn-link text-decoration-none">Cancel</a>
+                        <button type="submit" class="btn btn-primary px-4">Save Changes</button>
+                    </div>
+                </div>
+            </form>
+        </article>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete the subscription <strong>{{ subscription.username }}</strong>? This
+                action cannot
+                be undone.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Keep subscription</button>
+                <form action="delete-subscription" method="POST" class="d-inline">
+                    <input type="hidden" name="id" value="{{ subscription.id }}">
+                    <button type="submit" class="btn btn-danger">Yes, Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

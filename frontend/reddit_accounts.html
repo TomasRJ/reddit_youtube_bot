@@ -4,13 +4,13 @@
         <thead>
             <tr>
                 <th scope="col">Username</th>
-                <th scope="col">OAuth expire datetime</th>
+                <th scope="col">OAuth token expires at</th>
             </tr>
         </thead>
         <tbody>
             {{#each reddit_accounts}}
             <tr>
-                <td>{{this.username}}</td>
+                <td><a href="account/{{this.id}}">{{this.username}}</a></td>
                 <td>{{this.expires_at}}</td>
             </tr>
             {{else}}
