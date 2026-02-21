@@ -9,15 +9,17 @@
     <div class="d-flex justify-content-around">
         <article class="mt-5 mx-0 p-4 col-lg-5 col-md-8 container-sm border border-black rounded">
             <h4>Authorize to post on Reddit</h4>
-            <form method="post" action="forms/reddit">
+            <form method="post" action="forms/reddit" id="authorize-reddit-account">
                 <label for="authorize_moderate_submissions" class="form-label">Should Reddit account moderate
                     submissions?</label>
-                <select id="authorize_moderate_submissions" class="form-select" name="moderate_submissions" required>
+                <select form="authorize-reddit-account" id="authorize_moderate_submissions" class="form-select"
+                    name="moderate_submissions" required>
                     <option selected value="false">No</option>
                     <option value="true">Yes</option>
                 </select>
                 <label for="authorize_duration" class="form-label">Duration of the authorization</label>
-                <select id="authorize_duration" class="form-select" name="duration" required>
+                <select form="authorize-reddit-account" id="authorize_duration" class="form-select" name="duration"
+                    required>
                     <option selected value="permanent">Permanent</option>
                     <option value="temporary">Temporary</option>
                 </select>
@@ -25,8 +27,8 @@
                     history,
                     modconfig, modflair, modlog, modposts, modwiki, mysubreddits, privatemessages, read, report, save,
                     submit, subscribe, vote, wikiedit, wikiread)</label>
-                <input type="text" id="authorize_scope" name="scopes" class="form-control"
-                    value="identity,submit,modposts">
+                <input form="authorize-reddit-account" type="text" id="authorize_scope" name="scopes"
+                    class="form-control" value="identity,submit,modposts">
                 <button type="submit" id="authorize_submit" class="btn btn-primary mt-3">Open Link</button>
             </form>
         </article>
@@ -35,17 +37,19 @@
             <p><a href="https://www.streamweasels.com/%20tools/youtube-channel-id-and-%20user-id-convertor/"
                     target="_blank">Link to
                     website to get a YouTube channel id</a></p>
-            <form method="post" action="forms/subscribe">
+            <form method="post" action="forms/subscribe" id="subscribe-form">
                 <label for="subscribe_topic" class="form-label">Topic URL</label>
-                <input type="text" id="subscribe_topic" name="topic_url" class="form-control"
+                <input form="subscribe-form" type="text" id="subscribe_topic" name="topic_url" class="form-control"
                     value="https://www.youtube.com/xml/feeds/videos.xml?channel_id=" required>
                 <label for="subscripe_hmac" class="form-label">Subscription HMAC <a
                         href="https://pubsubhubbub.github.io/PubSubHubbub/pubsubhubbub-core-0.4.html#authednotify"
                         target="_blank">(info)</a></label>
-                <input type="text" id="subscripe_hmac" name="hmac_secret" class="form-control" required>
+                <input form="subscribe-form" type="text" id="subscripe_hmac" name="hmac_secret" class="form-control"
+                    required>
                 <label for="subscribe_post_shorts" class="form-label">Submit YouTube
                     shorts?</label>
-                <select id="subscribe_post_shorts" class="form-select" name="post_shorts" required>
+                <select form="subscribe-form" id="subscribe_post_shorts" class="form-select" name="post_shorts"
+                    required>
                     <option selected value="false">No</option>
                     <option value="true">Yes</option>
                 </select>
