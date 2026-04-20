@@ -195,14 +195,6 @@ async fn main_landing_page(State(state): State<Arc<AppState>>) -> Result<Html<St
 
     let linked_subscriptions = fetch_linked_subscriptions(&state.db_pool).await?;
 
-    local_hb.register_template_file("subscriptions", "frontend/subscriptions.html")?;
-
-    local_hb.register_template_file("reddit_accounts", "frontend/reddit_accounts.html")?;
-
-    local_hb.register_template_file("register_subreddit", "frontend/register_subreddit.html")?;
-
-    local_hb.register_template_file("link_subscription", "frontend/link_subscription.html")?;
-
     local_hb.register_template_file("body_content", "frontend/landing_page.html")?;
 
     let data = json!({

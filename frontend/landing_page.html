@@ -63,19 +63,174 @@
 </div>
 <section>
     <div class="d-flex justify-content-around" style="height: 400px;">
-        {{> reddit_accounts }}
+        <article class="mx-0 p-4 col-lg-5 col-md-8 container-sm border border-black rounded overflow-auto">
+            <h4>Reddit accounts</h4>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th scope="col">Username</th>
+                        <th scope="col">OAuth token expires at</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each reddit_accounts}}
+                    <tr>
+                        <td><a href="account/{{this.id}}">{{this.username}}</a></td>
+                        <td>{{this.expires_at}}</td>
+                    </tr>
+                    {{else}}
+                    <tr>
+                        <td colspan="2" class="empty">No Reddit accounts</td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+        </article>
 
-        {{> subscriptions }}
+        <article class="mx-0 p-4 col-lg-5 col-md-8 container-sm border border-black rounded overflow-auto">
+            <h4>Subscriptions</h4>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th scope="col">YouTube channel</th>
+                        <th scope="col">Expires at</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each subscriptions}}
+                    <tr>
+                        <td><a href="subscription/{{this.id}}">{{this.channel_name}}</a></td>
+                        <td>{{this.expires_at}}</td>
+                    </tr>
+                    {{else}}
+                    <tr>
+                        <td colspan="2" class="empty">No subscriptions</td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+        </article>
     </div>
 </section>
 <div class="my-2">
     <hr />
 </div>
-{{> register_subreddit }}
+<article class="d-flex justify-content-around" style="max-height: 600px;">
+    <section class="col px-4">
+        <h4 class="mb-4">Register a subreddit</h4>
+        <form method="post" action="forms/register_subreddit" id="register-subreddit-form">
+            <label for="subreddit_name" class="form-label">Subreddit name</label>
+            <input form="register-subreddit-form" type="text" id="subreddit_name" name="subreddit_name"
+                class="form-control" required>
+
+            <label for="submission_title_prefix" class="form-label">Submission title prefix</label>
+            <input form="register-subreddit-form" type="text" id="submission_title_prefix"
+                name="submission_title_prefix" class="form-control">
+
+            <label for="submission_title_suffix" class="form-label">Submission title suffix</label>
+            <input form="register-subreddit-form" type="text" id="submission_title_suffix"
+                name="submission_title_suffix" class="form-control">
+
+            <label for="submission_flair_id" class="form-label">Flair id</label>
+            <input form="register-subreddit-form" type="text" id="submission_flair_id" name="submission_flair_id"
+                class="form-control">
+
+            <input type="submit" id="authorize_submit" class="btn btn-primary mt-3" value="Register">
+        </form>
+    </section>
+    <section class="col-8 px-4 overflow-auto">
+        <h4 class="mb-4">Subreddits</h4>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Title prefix</th>
+                    <th scope="col">Title suffix</th>
+                    <th scope="col">Flair id</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each subreddits}}
+                <tr>
+                    <td><a href="subreddit/{{this.id}}">{{this.name}}</a></td>
+                    <td>{{this.title_prefix}}</td>
+                    <td>{{this.title_suffix}}</td>
+                    <td>{{this.flair_id}}</td>
+                </tr>
+                {{else}}
+                <tr>
+                    <td class="empty">No subreddits registered</td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </section>
+</article>
 <div class="my-2">
     <hr />
 </div>
-{{> link_subscription }}
+<article class="d-flex justify-content-around" style="max-height: 600px;">
+    <section class="col px-4">
+        <h4 class="mb-4">Link subscription to Reddit account and subreddit</h4>
+        <form action="forms/link_subscription" method="POST" id="subscription_reddit_link">
+            <label for="subscriptions" class="form-label">Choose a subscription:</label>
+            <select form="subscription_reddit_link" id="subscription_reddit_link__subscriptions" class="form-select"
+                name="subscription_id" required>
+                {{#each subscriptions}}
+                <option value="{{this.id}}">{{this.channel_name}}</option>
+                {{else}}
+                <option disabled>No subscriptions found</option>
+                {{/each}}
+            </select>
+
+            <label for="subscriptions" class="form-label">Choose a reddit account:</label>
+            <select form="subscription_reddit_link" id="subscription_reddit_link__reddit_accounts" class="form-select"
+                name="reddit_account_id" required>
+                {{#each reddit_accounts}}
+                <option value="{{this.id}}">{{this.username}}</option>
+                {{else}}
+                <option disabled>No reddit accounts found</option>
+                {{/each}}
+            </select>
+
+            <label for="subreddits" class="form-label">Choose a subreddit:</label>
+            <select form="subscription_reddit_link" id="subscription_reddit_link__subreddits" class="form-select"
+                name="subreddit_id" required>
+                {{#each subreddits}}
+                <option value="{{this.id}}">{{this.name}}</option>
+                {{else}}
+                <option disabled>No subreddits found</option>
+                {{/each}}
+            </select>
+            <input type="submit" class="btn btn-primary mt-3" value="Link subscription">
+        </form>
+    </section>
+    <section class="col-7 px-4 overflow-auto">
+        <h4>Linked subscriptions</h4>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th scope="col">Subscription</th>
+                    <th scope="col">Reddit account</th>
+                    <th scope="col">Subreddit</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each linked_subscriptions}}
+                <tr>
+                    <td><a href="subscription/{{this.subscription_id}}">{{this.channel_name}}</a></td>
+                    <td><a href="account/{{this.reddit_account_id}}">{{this.reddit_username}}</a></td>
+                    <td><a href="subreddit/{{this.subreddit_id}}">{{this.subreddit_name}}</a></td>
+                </tr>
+                {{else}}
+                <tr>
+                    <td colspan="3" class="empty">No linked subscriptions</td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </section>
+</article>
 <div class="my-2">
     <hr />
 </div>

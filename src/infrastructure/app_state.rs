@@ -27,6 +27,12 @@ impl AppState {
         let mut hb = Handlebars::new();
         hb.register_template_file("whole_document", "frontend/base_layout.html")
             .expect("Error parsing base_layout template");
+        hb.register_template_file("detail_card", "frontend/partials/detail_card.html")
+            .expect("Error parsing detail_card template");
+        hb.register_template_file("form_actions", "frontend/partials/form_actions.html")
+            .expect("Error parsing form_actions template");
+        hb.register_template_file("delete_modal", "frontend/partials/delete_modal.html")
+            .expect("Error parsing delete_modal template");
 
         let (scheduler_sender, scheduler_receiver) = mpsc::channel(100);
 
