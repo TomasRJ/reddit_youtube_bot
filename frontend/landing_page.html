@@ -6,117 +6,129 @@
     <article class="w-100">
         <p>This bot will automatically post a Reddit post when a new video is uploaded to a YouTube channel.</p>
     </article>
-    <div class="d-flex justify-content-around">
-        <article class="mt-5 mx-0 p-4 col-lg-5 col-md-8 container-sm border border-black rounded">
-            <h4>Authorize to post on Reddit</h4>
-            <form method="post" action="forms/reddit" id="authorize-reddit-account">
-                <label for="authorize_moderate_submissions" class="form-label">Should Reddit account moderate
-                    submissions?</label>
-                <select form="authorize-reddit-account" id="authorize_moderate_submissions" class="form-select"
-                    name="moderate_submissions" required>
-                    <option selected value="false">No</option>
-                    <option value="true">Yes</option>
-                </select>
-                <label for="authorize_duration" class="form-label">Duration of the authorization</label>
-                <select form="authorize-reddit-account" id="authorize_duration" class="form-select" name="duration"
-                    required>
-                    <option selected value="permanent">Permanent</option>
-                    <option value="temporary">Temporary</option>
-                </select>
-                <label for="authorize_scope" class="form-label">Scope (only valid values are: identity, edit, flair,
-                    history,
-                    modconfig, modflair, modlog, modposts, modwiki, mysubreddits, privatemessages, read, report, save,
-                    submit, subscribe, vote, wikiedit, wikiread)</label>
-                <input form="authorize-reddit-account" type="text" id="authorize_scope" name="scopes"
-                    class="form-control" value="identity,submit,modposts">
-                <button type="submit" id="authorize_submit" class="btn btn-primary mt-3">Open Link</button>
-            </form>
-        </article>
-        <article class="mt-5 mx-0 p-4 col-lg-5 col-md-8 container-sm border border-black rounded">
-            <h4>Subscribe to a YouTube channel</h4>
-            <p><a href="https://www.streamweasels.com/%20tools/youtube-channel-id-and-%20user-id-convertor/"
-                    target="_blank">Link to
-                    website to get a YouTube channel id</a></p>
-            <form method="post" action="forms/subscribe" id="subscribe-form">
-                <label for="subscribe_topic" class="form-label">Topic URL</label>
-                <input form="subscribe-form" type="text" id="subscribe_topic" name="topic_url" class="form-control"
-                    value="https://www.youtube.com/xml/feeds/videos.xml?channel_id=" required>
-                <label for="subscripe_hmac" class="form-label">Subscription HMAC <a
-                        href="https://pubsubhubbub.github.io/PubSubHubbub/pubsubhubbub-core-0.4.html#authednotify"
-                        target="_blank">(info)</a></label>
-                <input form="subscribe-form" type="text" id="subscripe_hmac" name="hmac_secret" class="form-control"
-                    required>
-                <label for="subscribe_post_shorts" class="form-label">Submit YouTube
-                    shorts?</label>
-                <select form="subscribe-form" id="subscribe_post_shorts" class="form-select" name="post_shorts"
-                    required>
-                    <option selected value="false">No</option>
-                    <option value="true">Yes</option>
-                </select>
-                <button type="submit" id="authorize_submit" class="btn btn-primary mt-3">Subscribe</button>
-            </form>
-        </article>
+    <div class="row g-4 mt-4">
+        <div class="col-12 col-lg-6">
+            <article class="p-4 border border-black rounded h-100">
+                <h4>Authorize to post on Reddit</h4>
+                <form method="post" action="forms/reddit" id="authorize-reddit-account">
+                    <label for="authorize_moderate_submissions" class="form-label">Should Reddit account moderate
+                        submissions?</label>
+                    <select form="authorize-reddit-account" id="authorize_moderate_submissions" class="form-select"
+                        name="moderate_submissions" required>
+                        <option selected value="false">No</option>
+                        <option value="true">Yes</option>
+                    </select>
+                    <label for="authorize_duration" class="form-label">Duration of the authorization</label>
+                    <select form="authorize-reddit-account" id="authorize_duration" class="form-select" name="duration"
+                        required>
+                        <option selected value="permanent">Permanent</option>
+                        <option value="temporary">Temporary</option>
+                    </select>
+                    <label for="authorize_scope" class="form-label">Scope (only valid values are: identity, edit, flair,
+                        history,
+                        modconfig, modflair, modlog, modposts, modwiki, mysubreddits, privatemessages, read, report,
+                        save,
+                        submit, subscribe, vote, wikiedit, wikiread)</label>
+                    <input form="authorize-reddit-account" type="text" id="authorize_scope" name="scopes"
+                        class="form-control" value="identity,submit,modposts">
+                    <button type="submit" id="authorize_submit" class="btn btn-primary mt-3">Open Link</button>
+                </form>
+            </article>
+        </div>
+        <div class="col-12 col-lg-6">
+            <article class="p-4 border border-black rounded h-100">
+                <h4>Subscribe to a YouTube channel</h4>
+                <p><a href="https://www.streamweasels.com/%20tools/youtube-channel-id-and-%20user-id-convertor/"
+                        target="_blank">Link to
+                        website to get a YouTube channel id</a></p>
+                <form method="post" action="forms/subscribe" id="subscribe-form">
+                    <label for="subscribe_topic" class="form-label">Topic URL</label>
+                    <input form="subscribe-form" type="text" id="subscribe_topic" name="topic_url" class="form-control"
+                        value="https://www.youtube.com/xml/feeds/videos.xml?channel_id=" required>
+                    <label for="subscripe_hmac" class="form-label">Subscription HMAC <a
+                            href="https://pubsubhubbub.github.io/PubSubHubbub/pubsubhubbub-core-0.4.html#authednotify"
+                            target="_blank">(info)</a></label>
+                    <input form="subscribe-form" type="text" id="subscripe_hmac" name="hmac_secret" class="form-control"
+                        required>
+                    <label for="subscribe_post_shorts" class="form-label">Submit YouTube
+                        shorts?</label>
+                    <select form="subscribe-form" id="subscribe_post_shorts" class="form-select" name="post_shorts"
+                        required>
+                        <option selected value="false">No</option>
+                        <option value="true">Yes</option>
+                    </select>
+                    <button type="submit" id="authorize_submit" class="btn btn-primary mt-3">Subscribe</button>
+                </form>
+            </article>
+        </div>
     </div>
 </section>
 <div class="my-2">
     <hr />
 </div>
 <section>
-    <div class="d-flex justify-content-around" style="height: 400px;">
-        <article class="mx-0 p-4 col-lg-5 col-md-8 container-sm border border-black rounded overflow-auto">
-            <h4>Reddit accounts</h4>
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th scope="col">Username</th>
-                        <th scope="col">OAuth token expires at</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{#each reddit_accounts}}
-                    <tr>
-                        <td><a href="account/{{this.id}}">{{this.username}}</a></td>
-                        <td>{{this.expires_at}}</td>
-                    </tr>
-                    {{else}}
-                    <tr>
-                        <td colspan="2" class="empty">No Reddit accounts</td>
-                    </tr>
-                    {{/each}}
-                </tbody>
-            </table>
-        </article>
-
-        <article class="mx-0 p-4 col-lg-5 col-md-8 container-sm border border-black rounded overflow-auto">
-            <h4>Subscriptions</h4>
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th scope="col">YouTube channel</th>
-                        <th scope="col">Expires at</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{#each subscriptions}}
-                    <tr>
-                        <td><a href="subscription/{{this.id}}">{{this.channel_name}}</a></td>
-                        <td>{{this.expires_at}}</td>
-                    </tr>
-                    {{else}}
-                    <tr>
-                        <td colspan="2" class="empty">No subscriptions</td>
-                    </tr>
-                    {{/each}}
-                </tbody>
-            </table>
-        </article>
+    <div class="row g-4">
+        <div class="col-12 col-lg-6">
+            <article class="p-4 border border-black rounded h-100">
+                <h4>Reddit accounts</h4>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th scope="col">Username</th>
+                                <th scope="col">OAuth token expires at</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{#each reddit_accounts}}
+                            <tr>
+                                <td><a href="account/{{this.id}}">{{this.username}}</a></td>
+                                <td>{{this.expires_at}}</td>
+                            </tr>
+                            {{else}}
+                            <tr>
+                                <td colspan="2" class="empty">No Reddit accounts</td>
+                            </tr>
+                            {{/each}}
+                        </tbody>
+                    </table>
+                </div>
+            </article>
+        </div>
+        <div class="col-12 col-lg-6">
+            <article class="p-4 border border-black rounded h-100">
+                <h4>Subscriptions</h4>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th scope="col">YouTube channel</th>
+                                <th scope="col">Expires at</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{#each subscriptions}}
+                            <tr>
+                                <td><a href="subscription/{{this.id}}">{{this.channel_name}}</a></td>
+                                <td>{{this.expires_at}}</td>
+                            </tr>
+                            {{else}}
+                            <tr>
+                                <td colspan="2" class="empty">No subscriptions</td>
+                            </tr>
+                            {{/each}}
+                        </tbody>
+                    </table>
+                </div>
+            </article>
+        </div>
     </div>
 </section>
 <div class="my-2">
     <hr />
 </div>
-<article class="d-flex justify-content-around" style="max-height: 600px;">
-    <section class="col px-4">
+<div class="row g-4">
+    <div class="col-12 col-md-5">
         <h4 class="mb-4">Register a subreddit</h4>
         <form method="post" action="forms/register_subreddit" id="register-subreddit-form">
             <label for="subreddit_name" class="form-label">Subreddit name</label>
@@ -137,40 +149,42 @@
 
             <input type="submit" id="authorize_submit" class="btn btn-primary mt-3" value="Register">
         </form>
-    </section>
-    <section class="col-8 px-4 overflow-auto">
+    </div>
+    <div class="col-12 col-md-7">
         <h4 class="mb-4">Subreddits</h4>
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th scope="col">Name</th>
-                    <th scope="col">Title prefix</th>
-                    <th scope="col">Title suffix</th>
-                    <th scope="col">Flair id</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{#each subreddits}}
-                <tr>
-                    <td><a href="subreddit/{{this.id}}">{{this.name}}</a></td>
-                    <td>{{this.title_prefix}}</td>
-                    <td>{{this.title_suffix}}</td>
-                    <td>{{this.flair_id}}</td>
-                </tr>
-                {{else}}
-                <tr>
-                    <td class="empty">No subreddits registered</td>
-                </tr>
-                {{/each}}
-            </tbody>
-        </table>
-    </section>
-</article>
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th scope="col">Name</th>
+                        <th scope="col">Title prefix</th>
+                        <th scope="col">Title suffix</th>
+                        <th scope="col">Flair id</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each subreddits}}
+                    <tr>
+                        <td><a href="subreddit/{{this.id}}">{{this.name}}</a></td>
+                        <td>{{this.title_prefix}}</td>
+                        <td>{{this.title_suffix}}</td>
+                        <td>{{this.flair_id}}</td>
+                    </tr>
+                    {{else}}
+                    <tr>
+                        <td class="empty">No subreddits registered</td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 <div class="my-2">
     <hr />
 </div>
-<article class="d-flex justify-content-around" style="max-height: 600px;">
-    <section class="col px-4">
+<div class="row g-4">
+    <div class="col-12 col-md-5">
         <h4 class="mb-4">Link subscription to Reddit account and subreddit</h4>
         <form action="forms/link_subscription" method="POST" id="subscription_reddit_link">
             <label for="subscriptions" class="form-label">Choose a subscription:</label>
@@ -204,33 +218,35 @@
             </select>
             <input type="submit" class="btn btn-primary mt-3" value="Link subscription">
         </form>
-    </section>
-    <section class="col-7 px-4 overflow-auto">
+    </div>
+    <div class="col-12 col-md-7">
         <h4>Linked subscriptions</h4>
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th scope="col">Subscription</th>
-                    <th scope="col">Reddit account</th>
-                    <th scope="col">Subreddit</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{#each linked_subscriptions}}
-                <tr>
-                    <td><a href="subscription/{{this.subscription_id}}">{{this.channel_name}}</a></td>
-                    <td><a href="account/{{this.reddit_account_id}}">{{this.reddit_username}}</a></td>
-                    <td><a href="subreddit/{{this.subreddit_id}}">{{this.subreddit_name}}</a></td>
-                </tr>
-                {{else}}
-                <tr>
-                    <td colspan="3" class="empty">No linked subscriptions</td>
-                </tr>
-                {{/each}}
-            </tbody>
-        </table>
-    </section>
-</article>
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th scope="col">Subscription</th>
+                        <th scope="col">Reddit account</th>
+                        <th scope="col">Subreddit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each linked_subscriptions}}
+                    <tr>
+                        <td><a href="subscription/{{this.subscription_id}}">{{this.channel_name}}</a></td>
+                        <td><a href="account/{{this.reddit_account_id}}">{{this.reddit_username}}</a></td>
+                        <td><a href="subreddit/{{this.subreddit_id}}">{{this.subreddit_name}}</a></td>
+                    </tr>
+                    {{else}}
+                    <tr>
+                        <td colspan="3" class="empty">No linked subscriptions</td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 <div class="my-2">
     <hr />
 </div>

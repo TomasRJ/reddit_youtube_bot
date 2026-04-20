@@ -1,12 +1,15 @@
 <hr class="my-4">
 
-<div class="d-flex justify-content-between">
-    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+<hr class="my-4">
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <button type="button" class="btn btn-outline-danger text-nowrap" data-bs-toggle="modal"
+        data-bs-target="#deleteModal">
         {{ delete_label }}
     </button>
 
-    <div>
-        <a href="/" class="btn btn-link text-decoration-none">Cancel</a>
-        <button type="submit" class="btn btn-primary px-4">Save Changes</button>
+    <div class="d-flex align-items-center gap-2">
+        <a href="/" class="btn btn-link text-decoration-none text-nowrap">Cancel</a>
+        <button type="submit" class="btn btn-primary px-4 text-nowrap">Save Changes</button>
     </div>
 </div>

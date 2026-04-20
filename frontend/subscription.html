@@ -9,7 +9,8 @@
 
     <div class="mb-3">
         <label for="hmac_secret" class="form-label fw-bold">HMAC secret</label>
-        <input type="text" class="form-control" id="hmac_secret" value="{{ subscription.hmac_secret }}">
+        <input type="text" class="form-control" id="hmac_secret" name="hmac_secret"
+            value="{{ subscription.hmac_secret }}">
     </div>
 
     <div class="row mb-3">
@@ -33,5 +34,4 @@
 </form>
 {{/detail_card}}
 
-{{> delete_modal entity_name=subscription.channel_name delete_action="delete-subscription" keep_label="Keep
-subscription" id_field=subscription.id}}
+{{> delete_modal entity_name=subscription.channel_name delete_action="delete-subscription" keep_label="Keep subscription" id_field=subscription.id}}
