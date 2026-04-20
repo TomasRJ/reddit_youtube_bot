@@ -1,0 +1,65 @@
+<article class="d-flex justify-content-around" style="max-height: 600px;">
+    <section class="col px-4">
+        <h4 class="mb-4">Link subscription to Reddit account and subreddit</h4>
+        <form action="forms/link_subscription" method="POST" id="subscription_reddit_link">
+
+            <label for="subscriptions" class="form-label">Choose a subscription:</label>
+            <select form="subscription_reddit_link" id="subscription_reddit_link__subscriptions" class="form-select"
+                name="subscription_id" required>
+                {{ #each subscriptions }}
+                <option value="{{ this.id }}">{{ this.channel_name }}</option>
+                {{ else }}
+                <option disabled>No subscriptions found</option>
+                {{ /each }}
+            </select>
+
+
+            <label for="subscriptions" class="form-label">Choose a reddit account:</label>
+            <select form="subscription_reddit_link" id="subscription_reddit_link__reddit_accounts" class="form-select"
+                name="reddit_account_id" required>
+                {{ #each reddit_accounts }}
+                <option value="{{ this.id }}">{{ this.username }}</option>
+                {{ else }}
+                <option disabled>No reddit accounts found</option>
+                {{ /each }}
+            </select>
+
+
+            <label for="subreddits" class="form-label">Choose a subreddit:</label>
+            <select form="subscription_reddit_link" id="subscription_reddit_link__subreddits" class="form-select"
+                name="subreddit_id" required>
+                {{ #each subreddits }}
+                <option value="{{ this.id }}">{{ this.name }}</option>
+                {{ else }}
+                <option disabled>No subreddits found</option>
+                {{ /each }}
+            </select>
+            <input type="submit" class="btn btn-primary mt-3" value="Link subscription">
+        </form>
+    </section>
+    <section class="col-7 px-4 overflow-auto">
+        <h4>Linked subscriptions</h4>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th scope="col">Subscription</th>
+                    <th scope="col">Reddit acount</th>
+                    <th scope="col">Subreddit</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ #each linked_subscriptions }}
+                <tr>
+                    <td><a href="subscription/{{ this.subscription_id }}">{{ this.channel_name }}</a></td>
+                    <td><a href="account/{{ this.reddit_account_id }}">{{ this.reddit_username }}</a></td>
+                    <td><a href="subreddit/{{ this.subreddit_id }}">{{ this.subreddit_name }}</a></td>
+                </tr>
+                {{ else }}
+                <tr>
+                    <td colspan="3" class="empty">No subreddits registered</td>
+                </tr>
+                {{ /each }}
+            </tbody>
+        </table>
+    </section>
+</article>

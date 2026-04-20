@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use axum::{
+    Form,
     extract::{Query, State},
     response::Redirect,
 };
@@ -18,20 +19,24 @@ use crate::{
     server::{
         ApiError, RedditCredentials,
         repository::{
-            fetch_form_data, fetch_reddit_accounts_for_subscription,
-            fetch_submissions_on_subreddit, get_or_create_subreddit, save_reddit_account,
-            save_reddit_submission, update_reddit_oauth_token,
+            fetch_form_data, fetch_reddit_accounts, fetch_reddit_accounts_for_subscription,
+            fetch_submissions_on_subreddit, fetch_subreddits, get_or_create_subreddit,
+            save_reddit_account, save_reddit_submission, update_reddit_oauth_token,
             update_reddit_submission_sticky_state,
         },
         shared::{
-            self, HTTP_CLIENT, RedditAccount, RedditAuthorization, RedditOAuthToken,
-            RedditSubmissionData, Subreddit,
+            self, HTTP_CLIENT, RedditAccount, RedditAccountDTO, RedditAuthorization,
+            RedditOAuthToken, RedditSubmissionData, Subreddit,
         },
     },
 };
 
 pub fn router() -> OpenApiRouter<Arc<AppState>> {
-    OpenApiRouter::new().routes(routes!(reddit_callback))
+    OpenApiRouter::new()
+        .routes(routes!(reddit_callback))
+        .routes(routes!(
+            moderate_submissions_for_reddit_account_and_subreddit
+        ))
 }
 
 impl From<uuid::Error> for ApiError {
@@ -293,8 +298,11 @@ fn youtube_url_to_video_id(url: &Url) -> Option<String> {
 
     if domain.ends_with("youtube.com") {
         // Handle https://youtube.com/shorts/ID
-        if url.path_segments()?.next() == Some("shorts") {
-            return url.path_segments()?.next().map(|id| id.to_string());
+        if let Some(mut segments) = url.path_segments() {
+            if segments.next() == Some("shorts") {
+                // Use .find to skip any potential empty segment from a trailing slash
+                return segments.find(|&s| !s.is_empty()).map(|id| id.to_string());
+            }
         }
 
         // Handle https://youtube.com/watch?v=ID
@@ -368,30 +376,38 @@ pub async fn get_associated_reddit_accounts_for_subscription(
     let mut reddit_accounts = Vec::new();
 
     for reddit_account in raw_reddit_accounts {
-        let mut oauth_token: RedditOAuthToken = serde_json::from_str(&reddit_account.oauth_token)?;
+        let reddit_account = to_reddit_account(state, &reddit_account).await?;
 
-        if let Some(refresh_token) = &oauth_token.refresh_token
-            && Utc::now().timestamp() >= reddit_account.expires_at
-        {
-            println!(
-                "The OAuth token for https://www.reddit.com/user/{} has expired, refreshing token.",
-                reddit_account.username
-            );
-
-            oauth_token = refresh_reddit_oauth_token(&state, refresh_token).await?;
-
-            update_reddit_oauth_token(&state.db_pool, &reddit_account.id, &oauth_token).await?;
-        }
-
-        reddit_accounts.push(RedditAccount {
-            id: reddit_account.id,
-            username: reddit_account.username.clone(),
-            oauth_token,
-            moderate_submissions: reddit_account.moderate_submissions,
-        });
+        reddit_accounts.push(reddit_account);
     }
 
     Ok(reddit_accounts)
+}
+
+async fn to_reddit_account(
+    state: &Arc<AppState>,
+    reddit_account: &RedditAccountDTO,
+) -> Result<RedditAccount, ApiError> {
+    let mut oauth_token: RedditOAuthToken = serde_json::from_str(&reddit_account.oauth_token)?;
+    if let Some(refresh_token) = &oauth_token.refresh_token
+        && Utc::now().timestamp() >= reddit_account.expires_at
+    {
+        println!(
+            "The OAuth token for https://www.reddit.com/user/{} has expired, refreshing token.",
+            reddit_account.username
+        );
+
+        oauth_token = refresh_reddit_oauth_token(&state, refresh_token).await?;
+
+        update_reddit_oauth_token(&state.db_pool, &reddit_account.id, &oauth_token).await?;
+    }
+
+    Ok(RedditAccount {
+        id: reddit_account.id.clone(),
+        username: reddit_account.username.clone(),
+        oauth_token,
+        moderate_submissions: reddit_account.moderate_submissions,
+    })
 }
 
 pub async fn refresh_reddit_oauth_token(
@@ -502,6 +518,11 @@ pub async fn moderate_submission(
         return Ok(());
     }
 
+    println!(
+        "Now moderating submissions for the Reddit account https://www.reddit.com/u/{} on the https://www.reddit.com/r/{} subreddit.",
+        reddit_account.username, subreddit.name
+    );
+
     // subreddit_submissions is ordered by timestamp ascending
     let oldest_stickied_submission = subreddit_submissions.iter().find(|s| s.stickied);
 
@@ -524,15 +545,37 @@ pub async fn moderate_submission(
         return Ok(());
     };
 
-    set_reddit_submission_sticky_state(&state.db_pool, &oldest_stickied_submission.id, &false)
-        .await?;
-    set_reddit_submission_sticky_state(&state.db_pool, &previous_submission.id, &true).await?;
+    println!(
+        "Current oldest stickied submission: {:?} | previous submission: {:?}",
+        oldest_stickied_submission, previous_submission
+    );
+
+    println!("Now unstickying the oldest stickied submission");
+    set_reddit_submission_sticky_state(
+        &state.db_pool,
+        &reddit_account.oauth_token,
+        &oldest_stickied_submission.id,
+        &false,
+    )
+    .await?;
+    println!("Successfully unstickied the oldest stickied submission");
+
+    println!("Now stickying the previous submission");
+    set_reddit_submission_sticky_state(
+        &state.db_pool,
+        &reddit_account.oauth_token,
+        &previous_submission.id,
+        &true,
+    )
+    .await?;
+    println!("Successfully stickyied the previous submission");
 
     Ok(())
 }
 
 async fn set_reddit_submission_sticky_state(
     pool: &Pool<Sqlite>,
+    oauth_token: &RedditOAuthToken,
     submission_id: &String,
     state: &bool,
 ) -> Result<(), ApiError> {
@@ -540,6 +583,7 @@ async fn set_reddit_submission_sticky_state(
 
     let sticky_response = client
         .post("https://oauth.reddit.com/api/set_subreddit_sticky")
+        .bearer_auth(&oauth_token.access_token)
         .form(&[
             ("api_type", "json"),
             ("id", submission_id),
@@ -547,8 +591,21 @@ async fn set_reddit_submission_sticky_state(
         ])
         .send()
         .await?
-        .json::<serde_json::Value>()
-        .await?;
+        .text()
+        .await
+        .map_err(|e| {
+            ApiError::InternalError(format!(
+                "Error accessing sticky_response response text: {:?}",
+                e
+            ))
+        })?;
+
+    let sticky_response: serde_json::Value = serde_json::from_str(&sticky_response).map_err(|e| {
+            ApiError::InternalError(format!(
+                "Error json deserializing sticky_response response: {:?} | original response body: {}",
+                e, sticky_response
+            ))
+        })?;
 
     let sticky_errors = sticky_response["json"]["errors"].as_array();
 
@@ -566,4 +623,79 @@ async fn set_reddit_submission_sticky_state(
     update_reddit_submission_sticky_state(&pool, &submission_id, &state).await?;
 
     Ok(())
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+struct ModerateSubmissionsForm {
+    pub reddit_username: String,
+    pub subreddit_name: String,
+}
+
+/// Reddit moderate_submissions for account and subreddit
+#[utoipa::path(
+        post,
+        request_body(content = ModerateSubmissionsForm, description = "Moderate submissions form data", content_type = "application/x-www-form-urlencoded"),
+        path = "/moderate_submissions",
+        description = "Reddit moderate submissions for an Reddit account and subreddit",
+        responses(
+            (status = 303, description = "Reddit moderate submissions successfully handled"),
+            (status = 400, description = "Invalid form data."),
+            (status = 500, description = "Internal server error."),
+        ),
+        tag = "reddit"
+    )]
+#[axum::debug_handler]
+async fn moderate_submissions_for_reddit_account_and_subreddit(
+    State(state): State<Arc<AppState>>,
+    Form(form_input): Form<ModerateSubmissionsForm>,
+) -> Result<Redirect, ApiError> {
+    let reddit_accounts = fetch_reddit_accounts(&state.db_pool).await?;
+
+    let mut reddit_account = None;
+
+    for reddit_account_dto in &reddit_accounts {
+        let account = to_reddit_account(&state, reddit_account_dto).await?;
+        if account
+            .username
+            .eq_ignore_ascii_case(&form_input.reddit_username)
+        {
+            reddit_account = Some(account);
+            break;
+        }
+    }
+
+    let reddit_account = if let Some(account) = reddit_account {
+        account
+    } else {
+        println!(
+            "No Reddit account found for username: {}",
+            form_input.reddit_username
+        );
+        return Ok(Redirect::to(&state.base_url));
+    };
+
+    let subreddits = fetch_subreddits(&state.db_pool).await?;
+
+    let subreddit = subreddits
+        .iter()
+        .find(|s| s.name.to_lowercase() == form_input.subreddit_name.to_lowercase());
+
+    let subreddit = if let Some(sub) = subreddit {
+        sub
+    } else {
+        println!(
+            "No subreddits found for subreddit name: {}",
+            form_input.subreddit_name
+        );
+        return Ok(Redirect::to(&state.base_url));
+    };
+
+    println!(
+        "now moderating submissions for the '{}' Reddit account and '{}' subreddit",
+        reddit_account.username, subreddit.name
+    );
+
+    moderate_submission(&state, &reddit_account, subreddit).await?;
+
+    Ok(Redirect::to(&state.base_url))
 }

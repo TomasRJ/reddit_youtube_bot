@@ -14,7 +14,7 @@ use crate::{
     infrastructure::AppState,
     server::{
         ApiError,
-        repository::save_form_data,
+        repository::{register_subreddit_form, register_subscription_link, save_form_data},
         shared::{
             FormType, RedditAuthorization, RedditAuthorizeDuration, YouTubeSubscription,
             extract_channel_id_from_topic_url, subscribe_to_channel,
@@ -26,6 +26,8 @@ pub fn router() -> OpenApiRouter<Arc<AppState>> {
     OpenApiRouter::new()
         .routes(routes!(reddit_authorize_submission))
         .routes(routes!(youtube_channel_subscribe))
+        .routes(routes!(register_subreddit))
+        .routes(routes!(link_subscription))
 }
 
 impl From<serde_json::Error> for ApiError {
@@ -221,6 +223,103 @@ async fn youtube_channel_subscribe(
         &subscription.hmac_secret,
     )
     .await?;
+
+    Ok(Redirect::to(&state.base_url))
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+struct RegisterSubredditForm {
+    pub subreddit_name: String,
+    #[serde(deserialize_with = "empty_string_is_none")]
+    pub submission_title_prefix: Option<String>,
+    #[serde(deserialize_with = "empty_string_is_none")]
+    pub submission_title_suffix: Option<String>,
+    #[serde(deserialize_with = "empty_string_is_none")]
+    pub submission_flair_id: Option<String>,
+}
+
+fn empty_string_is_none<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = Option::<String>::deserialize(deserializer)?;
+    Ok(s.filter(|s| !s.trim().is_empty()))
+}
+
+/// Register a new subreddit
+#[utoipa::path(
+        post,
+        request_body(content = RegisterSubredditForm, description = "Register a new subreddit", content_type = "application/x-www-form-urlencoded"),
+        path = "/register_subreddit",
+        description = "Register a new subreddit to submit videos to.",
+        responses(
+            (status = 303, description = "Successfully registered a new subreddit."),
+            (status = 400, description = "Invalid form data."),
+            (status = 500, description = "Internal server error."),
+        ),
+        tag = "forms"
+    )]
+#[axum::debug_handler]
+async fn register_subreddit(
+    State(state): State<Arc<AppState>>,
+    Form(form_input): Form<RegisterSubredditForm>,
+) -> Result<Redirect, ApiError> {
+    register_subreddit_form(
+        &state.db_pool,
+        &form_input.subreddit_name,
+        &form_input.submission_title_prefix,
+        &form_input.submission_title_suffix,
+        &form_input.submission_flair_id,
+    )
+    .await?;
+
+    println!(
+        "Successfully registered {} to the DB.",
+        &form_input.subreddit_name
+    );
+
+    Ok(Redirect::to(&state.base_url))
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+struct LinkSubscriptionForm {
+    pub subscription_id: String,
+    pub reddit_account_id: String,
+    pub subreddit_id: i64,
+}
+
+/// Link subscription to reddit account with subreddit
+#[utoipa::path(
+        post,
+        request_body(content = LinkSubscriptionForm, description = "Chosen subscription, reddit account and subreddit w/ potential title prefix/suffix and flair id.", content_type = "application/x-www-form-urlencoded"),
+        path = "/link_subscription",
+        description = "Link a subscription to use  reddit account on to submit videos to subreddit",
+        responses(
+            (status = 303, description = "Successfully sLink a subscription to use  reddit account on to submit videos to subreddit."),
+            (status = 400, description = "Invalid form data."),
+            (status = 500, description = "Internal server error."),
+        ),
+        tag = "forms"
+    )]
+#[axum::debug_handler]
+async fn link_subscription(
+    State(state): State<Arc<AppState>>,
+    Form(form_input): Form<LinkSubscriptionForm>,
+) -> Result<Redirect, ApiError> {
+    Uuid::try_parse(&form_input.subscription_id)?;
+    Uuid::try_parse(&form_input.reddit_account_id)?;
+
+    println!("link_subscription: {:?}", form_input);
+
+    register_subscription_link(
+        &state.db_pool,
+        &form_input.subscription_id,
+        &form_input.reddit_account_id,
+        &form_input.subreddit_id,
+    )
+    .await?;
+
+    println!("Successfully linked subscription to reddit account and subreddit.");
 
     Ok(Redirect::to(&state.base_url))
 }

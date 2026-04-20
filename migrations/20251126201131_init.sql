@@ -47,12 +47,6 @@ CREATE TABLE reddit_accounts (
 
 CREATE INDEX reddit_accounts_index ON reddit_accounts (id);
 
-CREATE TABLE subscription_reddit_accounts (
-    subscription_id TEXT NOT NULL,
-    reddit_account_id INTEGER NOT NULL,
-    PRIMARY KEY (subscription_id, reddit_account_id),
-    FOREIGN KEY (reddit_account_id) REFERENCES reddit_accounts(id) ON DELETE CASCADE
-);
 
 CREATE TABLE subreddits (
     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
@@ -64,10 +58,13 @@ CREATE TABLE subreddits (
 
 CREATE INDEX subreddits_index ON subreddits (id);
 
-CREATE TABLE reddit_account_subreddits (
-    reddit_account_id INTEGER NOT NULL,
+CREATE TABLE subscription_links (
+    subscription_id TEXT NOT NULL,
+    reddit_account_id TEXT NOT NULL,
     subreddit_id INTEGER NOT NULL,
-    PRIMARY KEY (reddit_account_id, subreddit_id),
+    PRIMARY KEY (subscription_id, reddit_account_id, subreddit_id),
+    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
+    FOREIGN KEY (reddit_account_id) REFERENCES reddit_accounts(id) ON DELETE CASCADE,
     FOREIGN KEY (subreddit_id) REFERENCES subreddits(id) ON DELETE CASCADE
 );
 

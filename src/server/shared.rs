@@ -144,6 +144,7 @@ pub struct RedditAccount {
     pub moderate_submissions: bool,
 }
 
+#[derive(Serialize)]
 pub struct Subreddit {
     pub id: i64,
     pub name: String,
@@ -186,6 +187,16 @@ pub enum SubCommand {
         subscription_id: String,
         wait_secs: i64,
     },
+}
+
+#[derive(Serialize)]
+pub struct LinkedSubscription {
+    pub subscription_id: String,
+    pub channel_name: String,
+    pub reddit_account_id: String,
+    pub reddit_username: String,
+    pub subreddit_id: i64,
+    pub subreddit_name: String,
 }
 
 // Static vars

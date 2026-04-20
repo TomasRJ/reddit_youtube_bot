@@ -1,0 +1,73 @@
+<div class="container mt-5">
+    <div class="card shadow-sm mx-auto" style="max-width: 600px;">
+        <header class="card-header bg-white py-3">
+            <h2 class="h5 mb-0 text-primary">Subreddit</h2>
+        </header>
+
+        <article class="card-body">
+            <section class="col px-4">
+                <form method="post" action="forms/register_subreddit" id="register-subreddit-form">
+                    <input type="hidden" name="id" value="{{ subreddit.id }}">
+
+                    <label for="subreddit_name" class="form-label">Subreddit name</label>
+                    <input form="register-subreddit-form" type="text" id="subreddit_name" name="subreddit_name"
+                        value="{{ subreddit.name }}" class="form-control" disabled>
+
+                    <label for="submission_title_prefix" class="form-label">Submission title prefix</label>
+                    <input form="register-subreddit-form" type="text" id="submission_title_prefix"
+                        name="submission_title_prefix" value="{{ subreddit.submission_title_prefix }}"
+                        class="form-control">
+
+                    <label for="submission_title_suffix" class="form-label">Submission title suffix</label>
+                    <input form="register-subreddit-form" type="text" id="submission_title_suffix"
+                        name="submission_title_suffix" value="{{ subreddit.submission_title_suffix }}"
+                        class="form-control">
+
+                    <label for="submission_flair_id" class="form-label">Flair id</label>
+                    <input form="register-subreddit-form" type="text" id="submission_flair_id"
+                        name="submission_flair_id" value="{{ subreddit.flair_id }}" class="form-control">
+
+                    <input type="submit" id="authorize_submit" class="btn btn-primary mt-3" value="Register">
+
+
+                    <hr class="my-4">
+
+                    <div class="d-flex justify-content-between">
+                        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal"
+                            data-bs-target="#deleteModal">
+                            Delete subreddit
+                        </button>
+
+                        <div>
+                            <a href="/" class="btn btn-link text-decoration-none">Cancel</a>
+                            <button type="submit" class="btn btn-primary px-4">Save Changes</button>
+                        </div>
+                    </div>
+                </form>
+            </section>
+        </article>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete the subreddit <strong>{{ subreddit.name }}</strong>? This
+                action cannot
+                be undone.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Keep subreddit</button>
+                <form action="delete-subreddit" method="POST" class="d-inline">
+                    <input type="hidden" name="id" value="{{ subreddit.id }}">
+                    <button type="submit" class="btn btn-danger">Yes, Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

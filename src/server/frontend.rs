@@ -15,10 +15,11 @@ use crate::{
     server::{
         ApiError,
         repository::{
-            Subscription, fetch_reddit_accounts, fetch_subscriptions, get_reddit_account_by_id,
+            Subscription, fetch_linked_subscriptions, fetch_reddit_accounts, fetch_subreddits,
+            fetch_subscriptions, get_reddit_account_by_id, get_subreddit_by_id,
             get_subscription_by_id,
         },
-        shared::RedditAccountDTO,
+        shared::{RedditAccountDTO, Subreddit},
     },
 };
 
@@ -27,6 +28,7 @@ pub fn router() -> OpenApiRouter<Arc<AppState>> {
         .routes(routes!(main_landing_page))
         .routes(routes!(reddit_account_page))
         .routes(routes!(subscription_account_page))
+        .routes(routes!(subreddit_page))
 }
 
 impl From<handlebars::RenderError> for ApiError {
@@ -138,6 +140,27 @@ impl FrontendSubscriptionData {
     }
 }
 
+#[derive(Serialize)]
+struct FrontendSubredditData {
+    pub id: i64,
+    pub name: String,
+    pub title_prefix: Option<String>,
+    pub title_suffix: Option<String>,
+    pub flair_id: Option<String>,
+}
+
+impl FrontendSubredditData {
+    fn convert(subreddit: &Subreddit) -> Result<Self, ApiError> {
+        Ok(FrontendSubredditData {
+            id: subreddit.id.clone(),
+            name: subreddit.name.clone(),
+            title_prefix: subreddit.title_prefix.clone(),
+            title_suffix: subreddit.title_suffix.clone(),
+            flair_id: subreddit.flair_id.clone(),
+        })
+    }
+}
+
 /// Main landing page
 #[utoipa::path(
         get,
@@ -164,15 +187,29 @@ async fn main_landing_page(State(state): State<Arc<AppState>>) -> Result<Html<St
         .map(FrontendRedditAccountData::convert)
         .collect::<Result<Vec<FrontendRedditAccountData>, ApiError>>()?;
 
+    let subreddits = fetch_subreddits(&state.db_pool)
+        .await?
+        .iter()
+        .map(FrontendSubredditData::convert)
+        .collect::<Result<Vec<FrontendSubredditData>, ApiError>>()?;
+
+    let linked_subscriptions = fetch_linked_subscriptions(&state.db_pool).await?;
+
     local_hb.register_template_file("subscriptions", "frontend/subscriptions.html")?;
 
     local_hb.register_template_file("reddit_accounts", "frontend/reddit_accounts.html")?;
+
+    local_hb.register_template_file("register_subreddit", "frontend/register_subreddit.html")?;
+
+    local_hb.register_template_file("link_subscription", "frontend/link_subscription.html")?;
 
     local_hb.register_template_file("body_content", "frontend/landing_page.html")?;
 
     let data = json!({
         "reddit_accounts": reddit_accounts,
-        "subscriptions": subscriptions
+        "subscriptions": subscriptions,
+        "subreddits": subreddits,
+        "linked_subscriptions": linked_subscriptions
     });
 
     let whole_document = local_hb.render("whole_document", &data)?;
@@ -252,6 +289,43 @@ async fn subscription_account_page(
 
     let data = json!({
         "subscription": subscription,
+    });
+
+    let whole_document = local_hb.render("whole_document", &data)?;
+
+    Ok(Html(whole_document))
+}
+
+/// Subreddit page
+#[utoipa::path(
+        get,
+        path = "/subreddit/{id}",
+        params(
+            ("id" = i64, Path, description = "Subscription id", example = "1"),
+        ),
+        description = "Subscription page",
+        responses(
+            (status = 200, description = "Subscription page html.", content_type = "text/html; charset=utf-8")
+        ),
+        tag = "frontend"
+    )]
+#[axum::debug_handler]
+async fn subreddit_page(
+    State(state): State<Arc<AppState>>,
+    Path(subreddit_id): Path<i64>,
+) -> Result<Html<String>, ApiError> {
+    let mut local_hb = state.hb.clone();
+
+    let subreddit = get_subreddit_by_id(&state.db_pool, &subreddit_id)
+        .await
+        .map_err(|_| ApiError::NotFound("Subreddit doesn't exist".into()))?;
+
+    let subreddit = FrontendSubredditData::convert(&subreddit)?;
+
+    local_hb.register_template_file("body_content", "frontend/subreddit.html")?;
+
+    let data = json!({
+        "subreddit": subreddit,
     });
 
     let whole_document = local_hb.render("whole_document", &data)?;

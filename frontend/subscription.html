@@ -9,7 +9,11 @@
                 <a href="https://youtube.com/channel/{{ subscription.channel_id }}" target="_blank">{{
                     subscription.channel_name
                     }}</a>
+                <a href="https://youtube.com/channel/{{ subscription.channel_id }}" target="_blank">{{
+                    subscription.channel_name
+                    }}</a>
             </h5>
+            <hr class="my-4">
             <form action="/update-subscription" method="POST">
                 <input type="hidden" name="id" value="{{ subscription.id }}">
 

@@ -5,8 +5,8 @@ use uuid::Uuid;
 use crate::server::{
     ApiError,
     shared::{
-        RedditAccountDTO, RedditOAuthToken, Subreddit, Verification, VerificationMode,
-        YouTubeSubscription,
+        LinkedSubscription, RedditAccountDTO, RedditOAuthToken, Subreddit, Verification,
+        VerificationMode, YouTubeSubscription,
     },
 };
 
@@ -230,11 +230,11 @@ pub async fn fetch_reddit_accounts_for_subscription(
         r#"
         SELECT EXISTS (
             SELECT
-                sra.reddit_account_id
+                link.reddit_account_id
             FROM
-                subscription_reddit_accounts sra
+                subscription_links link
             WHERE
-                sra.subscription_id = ?
+                link.subscription_id = ?
             LIMIT 1
         ) AS "result: bool";        
         "#,
@@ -258,10 +258,10 @@ pub async fn fetch_reddit_accounts_for_subscription(
             ra.expires_at
         FROM
             reddit_accounts ra
-        INNER JOIN subscription_reddit_accounts sra ON
-            sra.reddit_account_id = ra.id
+        INNER JOIN subscription_links link ON
+            link.reddit_account_id = ra.id
         WHERE
-            sra.subscription_id = ?;
+            link.subscription_id = ?;
         "#,
         subscription_id
     )
@@ -314,11 +314,11 @@ pub async fn fetch_subreddits_for_reddit_account(
         r#"
         SELECT EXISTS (
             SELECT
-                ras.subreddit_id
+                link.subreddit_id
             FROM
-                reddit_account_subreddits ras
+                subscription_links link
             WHERE
-                ras.reddit_account_id = ?
+                link.reddit_account_id = ?
             LIMIT 1
         ) AS "result: bool";        
         "#,
@@ -342,10 +342,10 @@ pub async fn fetch_subreddits_for_reddit_account(
             s.flair_id
         FROM
             subreddits s
-        INNER JOIN reddit_account_subreddits ras ON
-            ras.subreddit_id = s.id
+        INNER JOIN subscription_links link ON
+            link.subreddit_id = s.id
         WHERE
-            ras.reddit_account_id = ?;
+            link.reddit_account_id = ?;
         "#,
         reddit_account_id
     )
@@ -459,6 +459,7 @@ pub async fn fetch_reddit_accounts(pool: &Pool<Sqlite>) -> Result<Vec<RedditAcco
     Ok(subscription)
 }
 
+#[derive(Debug)]
 pub struct RedditSubmission {
     pub id: String,
     pub stickied: bool,
@@ -640,4 +641,184 @@ pub async fn get_subscription_by_id(
     .await?;
 
     Ok(subscription)
+}
+
+pub async fn get_subreddit_by_id(
+    pool: &Pool<Sqlite>,
+    subreddit_id: &i64,
+) -> Result<Subreddit, ApiError> {
+    let subreddit = query_as!(
+        Subreddit,
+        r#"
+        SELECT
+            s.id,
+            s.name,
+            s.title_prefix,
+            s.title_suffix,
+            s.flair_id
+        FROM
+            subreddits s
+        WHERE
+            s.id = ?;
+        "#,
+        subreddit_id
+    )
+    .fetch_one(&*pool)
+    .await?;
+
+    Ok(subreddit)
+}
+
+pub async fn fetch_subreddits(pool: &Pool<Sqlite>) -> Result<Vec<Subreddit>, ApiError> {
+    let subscription = query_as!(
+        Subreddit,
+        r#"
+        SELECT
+            s.id,
+            s.name,
+            s.title_prefix,
+            s.title_suffix,
+            s.flair_id
+        FROM
+            subreddits s;
+        "#,
+    )
+    .fetch_all(&*pool)
+    .await?;
+
+    Ok(subscription)
+}
+
+pub async fn fetch_linked_subscriptions(
+    pool: &Pool<Sqlite>,
+) -> Result<Vec<LinkedSubscription>, ApiError> {
+    let linked_subscriptions = query_as!(
+        LinkedSubscription,
+        r#"
+        SELECT
+            subscriptions.id as subscription_id,
+            subscriptions.channel_name as channel_name,
+            ra.id as reddit_account_id,
+            ra.username as reddit_username,
+            subreddits.id as subreddit_id,
+            subreddits.name as subreddit_name
+        FROM
+            subscriptions
+        INNER JOIN subscription_links link ON
+            subscriptions.id = link.subscription_id
+        INNER JOIN reddit_accounts ra ON
+            link.reddit_account_id = ra.id
+        INNER JOIN subreddits ON
+            link.subreddit_id = subreddits.id
+        "#,
+    )
+    .fetch_all(&*pool)
+    .await?;
+
+    Ok(linked_subscriptions)
+}
+
+pub async fn register_subscription_link(
+    pool: &Pool<Sqlite>,
+    subscription_id: &String,
+    reddit_account_id: &String,
+    subreddit_id: &i64,
+) -> Result<(), ApiError> {
+    let mut tx = pool.begin().await?;
+    let subscription_link_exist = query_scalar!(
+        r#"
+        SELECT EXISTS (
+            SELECT
+                links.subscription_id
+            FROM
+                subscription_links links
+            WHERE
+                links.subscription_id = ?
+                AND links.reddit_account_id = ?
+                AND links.subreddit_id = ?
+            LIMIT 1
+        ) AS "result: bool";
+        "#,
+        subscription_id,
+        reddit_account_id,
+        subreddit_id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+
+    if !subscription_link_exist {
+        let subscription_link_exist_result = query!(
+            r#"
+            INSERT INTO subscription_links(subscription_id, reddit_account_id, subreddit_id)
+            VALUES (?, ?, ?);
+            "#,
+            subscription_id,
+            reddit_account_id,
+            subreddit_id,
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        if subscription_link_exist_result.rows_affected() != 1 {
+            return Err(ApiError::InternalError(format!(
+                "save_reddit_submission rows_affected error: {:?}",
+                subscription_link_exist_result
+            )));
+        }
+    }
+
+    tx.commit().await?;
+
+    Ok(())
+}
+
+pub async fn register_subreddit_form(
+    pool: &Pool<Sqlite>,
+    subreddit_name: &String,
+    submission_title_prefix: &Option<String>,
+    submission_title_suffix: &Option<String>,
+    submission_flair_id: &Option<String>,
+) -> Result<(), ApiError> {
+    let subreddit_exists = query_scalar!(
+        r#"
+        SELECT EXISTS (
+            SELECT
+                s.id
+            FROM
+                subreddits s
+            WHERE
+                s.name LIKE ?
+            LIMIT 1
+        ) AS "result: bool";
+        "#,
+        subreddit_name,
+    )
+    .fetch_one(&*pool)
+    .await?;
+
+    if subreddit_exists {
+        return Ok(());
+    }
+
+    let register_subreddit_result = query!(
+        r#"
+        INSERT INTO subreddits(name, title_prefix, title_suffix, flair_id)
+        VALUES (?, ?, ?, ?);
+        "#,
+        subreddit_name,
+        submission_title_prefix,
+        submission_title_suffix,
+        submission_flair_id,
+    )
+    .execute(&*pool)
+    .await?;
+
+    if register_subreddit_result.rows_affected() != 1 {
+        return Err(ApiError::InternalError(format!(
+            "register_subreddit_result rows_affected error: {:?}",
+            register_subreddit_result
+        )));
+    }
+
+    Ok(())
 }
