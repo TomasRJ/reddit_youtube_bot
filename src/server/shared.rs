@@ -54,7 +54,7 @@ pub struct Verification {
     pub lease_seconds: Option<i64>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct Feed {
     #[serde(rename = "link")]
     pub links: Vec<Link>,
@@ -63,20 +63,35 @@ pub struct Feed {
     pub entry: Entry,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct Link {
     #[serde(rename = "@rel")]
     pub rel: String,
     #[serde(rename = "@href")]
     pub href: String,
+    #[serde(rename = "@hreflang")]
+    pub hreflang: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct Entry {
     pub id: String,
     #[serde(rename = "videoId")]
     pub yt_video_id: String,
     #[serde(rename = "channelId")]
+    pub yt_channel_id: String,
+    pub title: String,
+    #[serde(rename = "link")]
+    pub links: Vec<Link>,
+    pub author: Author,
+    pub published: DateTime<Utc>,
+    pub updated: DateTime<Utc>,
+}
+
+#[allow(dead_code)]
+pub struct SimpleEntry {
+    pub id: String,
+    pub yt_video_id: String,
     pub yt_channel_id: String,
     pub title: String,
     pub link: Link,
@@ -85,7 +100,31 @@ pub struct Entry {
     pub updated: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+impl Into<Option<SimpleEntry>> for &Entry {
+    fn into(self) -> Option<SimpleEntry> {
+        let entry_link = self
+            .links
+            .iter()
+            .find(|l| l.rel == "alternate" && l.hreflang.is_none())
+            .or_else(|| self.links.first());
+
+        match entry_link {
+            Some(link) => Some(SimpleEntry {
+                id: self.id.clone(),
+                yt_video_id: self.yt_video_id.clone(),
+                yt_channel_id: self.yt_channel_id.clone(),
+                title: self.title.clone(),
+                link: link.clone(),
+                author: self.author.clone(),
+                published: self.published,
+                updated: self.updated,
+            }),
+            None => None,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct Author {
     pub name: String,
     pub uri: String,

@@ -421,7 +421,7 @@ pub async fn refresh_reddit_oauth_token(
 pub async fn submit_video_to_subreddit(
     reddit_account: &RedditAccount,
     subreddit: &Subreddit,
-    entry: &shared::Entry,
+    entry: &shared::SimpleEntry,
 ) -> Result<RedditSubmissionData, ApiError> {
     let title = format!(
         "{prefix}{title}{suffix}",
@@ -453,8 +453,21 @@ pub async fn submit_video_to_subreddit(
         .form(&submission_form)
         .send()
         .await?
-        .json::<serde_json::Value>()
-        .await?;
+        .text()
+        .await
+        .map_err(|e| {
+            ApiError::InternalError(format!(
+                "Error accessing submission_response response text: {:?}",
+                e
+            ))
+        })?;
+
+    let submission_response: serde_json::Value = serde_json::from_str(&submission_response).map_err(|e| {
+            ApiError::InternalError(format!(
+                "Error json deserializing submission_response response: {:?} | original response body: {}",
+                e, submission_response
+            ))
+        })?;
 
     let submission_errors = submission_response["json"]["errors"].as_array();
 

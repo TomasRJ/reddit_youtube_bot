@@ -23,8 +23,8 @@ use crate::{
             video_already_submitted_to_subreddit,
         },
         shared::{
-            Author, Feed, HTTP_CLIENT, Verification, VerificationMode, YouTubeSubscription,
-            extract_channel_id_from_topic_url,
+            Author, Feed, HTTP_CLIENT, SimpleEntry, Verification, VerificationMode,
+            YouTubeSubscription, extract_channel_id_from_topic_url,
         },
     },
 };
@@ -135,12 +135,26 @@ async fn new_video_published(
         )))?;
 
     let feed = Feed::validate(&subscription.hmac_secret, headers, body)?;
+
+    let simple_entry = match Into::<Option<SimpleEntry>>::into(&feed.entry) {
+        Some(entry) => entry,
+        None => {
+            return Err(ApiError::InternalError(format!(
+                "Couldn't create SimpleEntry from following Feed: {:?}",
+                &feed
+            )));
+        }
+    };
+
     println!(
         "Received video request (title: '{}' link: {}) published from '{}' (link: {})",
-        feed.entry.title, feed.entry.link.href, feed.entry.author.name, feed.entry.author.uri
+        simple_entry.title,
+        simple_entry.link.href,
+        simple_entry.author.name,
+        simple_entry.author.uri
     );
 
-    let published_diff = (feed.entry.updated - feed.entry.published).num_seconds();
+    let published_diff = (simple_entry.updated - simple_entry.published).num_seconds();
     if published_diff > 60 {
         println!(
             "Video was determined to be an update to an old video, not a new video upload. The time difference between the 'updated' and 'published' fields was: {}",
@@ -150,7 +164,7 @@ async fn new_video_published(
     }
 
     // Shorts are only posted when the user has explicitly set post_shorts to true.
-    if feed.entry.link.href.contains("shorts") && !subscription.post_shorts {
+    if simple_entry.link.href.contains("shorts") && !subscription.post_shorts {
         return Ok(());
     }
 
@@ -160,7 +174,7 @@ async fn new_video_published(
     if subscription_reddit_accounts.is_empty() {
         println!(
             "The subscription: {} has no associated Reddit accounts to use for submit the video (title: '{}' link: {})",
-            subscription_id, feed.entry.title, feed.entry.link.href
+            subscription_id, simple_entry.title, simple_entry.link.href
         );
         return Ok(());
     }
@@ -178,7 +192,7 @@ async fn new_video_published(
         if reddit_account_subreddits.is_empty() {
             println!(
                 "The reddit account: {} has no associated subreddits to submit the video (title: '{}' link: {})",
-                reddit_account.username, feed.entry.title, feed.entry.link.href
+                reddit_account.username, simple_entry.title, simple_entry.link.href
             );
             continue;
         }
@@ -193,24 +207,24 @@ async fn new_video_published(
             if video_already_submitted_to_subreddit(
                 &state.db_pool,
                 &subreddit.id,
-                &feed.entry.yt_video_id,
+                &simple_entry.yt_video_id,
             )
             .await?
             {
                 println!(
                     "The video (title: '{}' link: {}) has been already submitted to the https://reddit.com/r/{} subreddit.",
-                    feed.entry.title, feed.entry.link.href, subreddit.name,
+                    simple_entry.title, simple_entry.link.href, subreddit.name,
                 );
                 continue;
             }
 
             println!(
                 "Now submitting the new video (title: '{}' link: {}) to the following subreddit: {}",
-                feed.entry.title, feed.entry.link.href, subreddit.name
+                simple_entry.title, simple_entry.link.href, subreddit.name
             );
 
             let reddit_submission =
-                submit_video_to_subreddit(&reddit_account, &subreddit, &feed.entry).await?;
+                submit_video_to_subreddit(&reddit_account, &subreddit, &simple_entry).await?;
 
             println!(
                 "Reddit submission successful. URL: {}",
@@ -220,7 +234,7 @@ async fn new_video_published(
             save_reddit_submission(
                 &state.db_pool,
                 &reddit_submission.id,
-                &feed.entry.yt_video_id,
+                &simple_entry.yt_video_id,
                 &reddit_account.id,
                 &subreddit.id,
                 &Utc::now().timestamp(),
